@@ -1,0 +1,2905 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abyss Crystal Hunter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #03000a;
+            user-select: none;
+            overflow: hidden;
+        }
+        .font-mono {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        /* Retro screen scanline effect overlay */
+        .scanline {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.04),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.04)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            z-index: 99;
+            opacity: 0.35;
+        }
+        
+        /* Time dilation visual distortion */
+        .bullet-time-active-canvas {
+            filter: contrast(1.2) saturate(0.55) sepia(0.1) brightness(0.8);
+            transition: filter 0.4s ease;
+        }
+
+        /* 3D fanned cards container at the bottom */
+        .card-hand-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 170px;
+            width: 100%;
+            perspective: 1000px;
+            padding-bottom: 10px;
+        }
+        .fanned-card {
+            position: absolute;
+            bottom: 5px;
+            width: 100px;
+            height: 145px;
+            transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1.15), border-color 0.2s ease, box-shadow 0.2s ease;
+            transform-origin: bottom center;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.7);
+        }
+        /* Elevate and align flat on hover */
+        .fanned-card:hover {
+            transform: translate(var(--hover-x), -30px) rotate(0deg) scale(1.25) !important;
+            z-index: 999 !important;
+            border-color: #c084fc !important;
+            box-shadow: 0 12px 28px rgba(168, 85, 247, 0.5), 0 0 10px rgba(255,255,255,0.15) inset;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center text-gray-200">
+    <div class="scanline"></div>
+
+    <!-- START SCREEN / LOBBY AREA -->
+    <div id="screen-start" class="absolute inset-0 w-full h-full flex flex-col justify-between p-6 md:p-12 bg-radial from-[#120a2e] to-[#04020a] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-purple-500/20 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-purple-600 to-red-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                    <i data-lucide="shield-alert" class="w-5 h-5 text-white animate-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 uppercase font-mono">
+                        Abyss Crystal Hunter
+                    </h1>
+                    <p class="text-[9px] text-purple-300/60 font-mono tracking-widest uppercase">Tactical Real-time Element Stock Reload Roguelike v3.1</p>
+                </div>
+            </div>
+            <!-- Meta Currency Panels -->
+            <div class="flex items-center gap-4 bg-purple-950/30 border border-purple-500/20 px-3 py-1.5 rounded-lg backdrop-blur-md">
+                <div class="flex items-center gap-1.5 text-xs">
+                    <i data-lucide="gem" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span class="text-gray-400 font-mono text-[10px]">결정체:</span>
+                    <span id="meta-crystal-count" class="font-black text-cyan-400 font-mono">0</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs">
+                    <i data-lucide="layers" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span class="text-gray-400 font-mono text-[10px]">스크랩:</span>
+                    <span id="meta-scrap-count" class="font-black text-purple-400 font-mono">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area: Select Character & Upgrade Legacies -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 my-auto max-w-7xl w-full mx-auto">
+            <!-- Character Choice -->
+            <div class="lg:col-span-7 flex flex-col gap-4">
+                <h2 class="text-xs font-black tracking-widest text-purple-400 uppercase flex items-center gap-1">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    심연 탐사대 기동 요원 선택
+                </h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <!-- Explorer (Balanced) -->
+                    <div onclick="selectCharacter('EXPLORER')" id="char-card-EXPLORER" class="group relative p-4 rounded-xl border border-purple-500/40 bg-purple-950/10 cursor-pointer transition-all hover:border-purple-500/80 hover:bg-purple-950/20 flex flex-col justify-between h-48">
+                        <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-[8px] font-mono rounded border border-purple-500/30">밸런스형</div>
+                        <div>
+                            <i data-lucide="crosshair" class="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform mb-2"></i>
+                            <h3 class="text-sm font-black text-white">익스플로러</h3>
+                            <p class="text-[10px] text-gray-400 mt-1 leading-relaxed">준수한 연사력과 안정성. 위기 시 순간 회피가 대폭 강화됩니다.</p>
+                        </div>
+                        <div class="text-[9px] font-mono text-purple-300/80 border-t border-purple-500/10 pt-2 mt-2">
+                            체력: 100 | 이동속도: 3.3 | 기본 파츠 장착
+                        </div>
+                    </div>
+
+                    <!-- Sentinel (Heavy) -->
+                    <div onclick="selectCharacter('SENTINEL')" id="char-card-SENTINEL" class="group relative p-4 rounded-xl border border-gray-800 bg-black/40 cursor-pointer transition-all hover:border-orange-500/40 hover:bg-orange-950/5 flex flex-col justify-between h-48">
+                        <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[8px] font-mono rounded border border-orange-500/20">중장갑</div>
+                        <div>
+                            <i data-lucide="shield" class="w-6 h-6 text-orange-400 group-hover:scale-110 transition-transform mb-2"></i>
+                            <h3 class="text-sm font-black text-white">센티널</h3>
+                            <p class="text-[10px] text-gray-400 mt-1 leading-relaxed">최대 체력이 높으며 격발 시 충격 분산 및 반동 제어력이 내장되어 있습니다.</p>
+                        </div>
+                        <div class="text-[9px] font-mono text-orange-300/80 border-t border-orange-500/10 pt-2 mt-2">
+                            체력: 130 | 이동속도: 2.8 | 반동 50% 감쇄
+                        </div>
+                    </div>
+
+                    <!-- Overseer (Agile) -->
+                    <div onclick="selectCharacter('OVERSEER')" id="char-card-OVERSEER" class="group relative p-4 rounded-xl border border-gray-800 bg-black/40 cursor-pointer transition-all hover:border-cyan-500/40 hover:bg-cyan-950/5 flex flex-col justify-between h-48">
+                        <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[8px] font-mono rounded border border-cyan-500/20">속도전</div>
+                        <div>
+                            <i data-lucide="zap" class="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform mb-2"></i>
+                            <h3 class="text-sm font-black text-white">오버시어</h3>
+                            <p class="text-[10px] text-gray-400 mt-1 leading-relaxed">체력은 낮지만 회피 쿨타임이 매우 짧으며 일시적 과부하 가속 효과를 얻습니다.</p>
+                        </div>
+                        <div class="text-[9px] font-mono text-cyan-300/80 border-t border-cyan-500/10 pt-2 mt-2">
+                            체력: 90 | 이동속도: 3.7 | 대시 후 추가 이동 속도
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Difficulty Settings -->
+                <div class="bg-black/40 border border-white/5 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-black text-gray-300 block">탐사 심야 심도 (Difficulty)</span>
+                        <span class="text-[10px] text-gray-400">심도가 깊어질수록 파수기들이 사나워지고 획득 결정량이 증가합니다.</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="setDifficulty('NORMAL')" id="diff-btn-NORMAL" class="px-3 py-1.5 rounded bg-purple-600 text-white font-bold text-xs cursor-pointer transition-colors">보통</button>
+                        <button onclick="setDifficulty('HARD')" id="diff-btn-HARD" class="px-3 py-1.5 rounded bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold text-xs cursor-pointer transition-colors">어려움</button>
+                    </div>
+                </div>
+
+                <div class="bg-black/40 border border-purple-500/20 p-4 rounded-xl font-mono text-[10px] text-gray-300 leading-relaxed">
+                    <span class="text-purple-300 font-black block mb-1">간소화된 원소 카드 규칙</span>
+                    원소 카드는 무한히 뽑히지 않고 <span class="text-yellow-400 font-bold">보유 재고</span>를 장전할 때 1개씩 소비합니다.
+                    적 처치, 필드 파밍, 상점 구매로 다시 보충할 수 있으며 조합은
+                    <span class="text-orange-300">화염+냉기=열충격</span>,
+                    <span class="text-yellow-300">화염+뇌전=플라즈마</span>,
+                    <span class="text-sky-300">냉기+공허=심연동결</span> 3개만 사용합니다.
+                </div>
+            </div>
+
+            <!-- Legacies Upgrade Shop -->
+            <div class="lg:col-span-5 bg-black/60 border border-purple-500/20 p-5 rounded-2xl flex flex-col justify-between min-h-[300px]">
+                <div>
+                    <h2 class="text-xs font-black tracking-widest text-cyan-400 uppercase flex items-center gap-1 border-b border-white/5 pb-2.5 mb-3">
+                        <i data-lucide="award" class="w-4 h-4"></i>
+                        영구 심연 유산 강화소 (Legacies Shop)
+                    </h2>
+                    
+                    <div class="flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-white">에테르 강화 피막 (+10 Max HP)</span>
+                                <span id="legacy-hp-status" class="text-[9px] text-gray-400">현재 강화도: 0/5</span>
+                            </div>
+                            <button onclick="buyMetaUpgrade('extra_max_hp', 8)" class="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-mono text-[10px] font-black tracking-wider flex items-center gap-1 cursor-pointer transition-transform active:scale-95">
+                                <i data-lucide="gem" class="w-3 h-3"></i> 8개
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-white">암시장 조율 무전 (상점 할인 +15%)</span>
+                                <span id="legacy-discount-status" class="text-[9px] text-gray-400">현재 강화도: 미해금</span>
+                            </div>
+                            <button onclick="buyMetaUpgrade('shop_discount', 12)" class="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-mono text-[10px] font-black tracking-wider flex items-center gap-1 cursor-pointer transition-transform active:scale-95">
+                                <i data-lucide="gem" class="w-3 h-3"></i> 12개
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-white">전술 가죽 벨트 (시작 시 추가 자원 공급)</span>
+                                <span id="legacy-slots-status" class="text-[9px] text-gray-400">현재 강화도: 미해금</span>
+                            </div>
+                            <button onclick="buyMetaUpgrade('starting_card_slots', 15)" class="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-mono text-[10px] font-black tracking-wider flex items-center gap-1 cursor-pointer transition-transform active:scale-95">
+                                <i data-lucide="gem" class="w-3 h-3"></i> 15개
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between mb-3">
+                        <div class="text-left pr-2">
+                            <span class="text-xs font-bold text-white block">전술 훈련 튜토리얼 기본 실행</span>
+                            <span class="text-[9px] text-gray-400">조작법 가이드(구르기, 원소 부착 및 연쇄 콤보 등)를 필수 훈련합니다.</span>
+                        </div>
+                        <input type="checkbox" id="skip-tutorial-check" class="w-5 h-5 accent-purple-500 rounded cursor-pointer shrink-0">
+                    </div>
+
+                    <button onclick="startNewExploration()" class="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-xs uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-purple-500/20 hover:scale-[1.01] cursor-pointer">
+                        탐사 개시 (START EXPLORATION)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center text-[10px] text-purple-300/40 border-t border-purple-500/10 pt-4 font-mono uppercase tracking-widest">
+            PRODUCED BY GOOGLE GEMINI - HIGH-END ROGUELIKE ARTIFACT
+        </div>
+    </div>
+
+    <!-- MAIN GAMEPLAY CANVAS SCREEN -->
+    <div id="screen-gameplay" class="hidden absolute inset-0 w-full h-full bg-[#030009] overflow-hidden flex flex-col">
+        <!-- Floating HUD Panel -->
+        <div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+            <!-- Left Side HP/Vitals -->
+            <div class="flex items-center gap-3 bg-black/85 border border-purple-500/30 px-3.5 py-2 rounded-xl backdrop-blur-md pointer-events-auto shadow-xl">
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-black text-purple-400 font-mono tracking-wider flex items-center gap-1">
+                            <i data-lucide="heart" class="w-3.5 h-3.5 text-red-500 fill-red-500"></i> LIFE VITALS
+                        </span>
+                        <span id="hud-hp-text" class="text-[11px] font-mono font-black text-white">100/100</span>
+                    </div>
+                    <div class="w-36 md:w-48 bg-gray-950 h-2.5 rounded-full overflow-hidden border border-white/5">
+                        <div id="hud-hp-bar" class="h-full bg-gradient-to-r from-red-600 to-pink-500 transition-all duration-100" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <div class="w-[1px] h-8 bg-purple-500/20 mx-1"></div>
+
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-black text-yellow-500 font-mono tracking-wider flex items-center gap-1">
+                            <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i> CHAMBER
+                        </span>
+                        <span id="hud-chamber-text" class="text-[11px] font-mono font-black text-white">0/6</span>
+                    </div>
+                    <div class="w-24 bg-gray-950 h-2.5 rounded-full overflow-hidden border border-white/5">
+                        <div id="hud-reload-bar" class="h-full bg-yellow-500 transition-all duration-150" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side Stats -->
+            <div class="flex items-center gap-4 bg-black/85 border border-purple-500/30 px-4 py-2.5 rounded-xl backdrop-blur-md pointer-events-auto shadow-xl font-mono">
+                <div class="flex items-center gap-1.5 text-xs text-orange-400">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                    <span class="font-black text-[11px]" id="hud-floor-text">지하 1층</span>
+                </div>
+                <div class="flex items-center gap-1 text-xs text-yellow-400">
+                    <i data-lucide="coins" class="w-4 h-4"></i>
+                    <span class="font-black text-[11px]" id="hud-gold-text">40G</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-pink-500">
+                    <i data-lucide="swatchbook" class="w-4 h-4"></i>
+                    <span class="font-black text-[11px]" id="hud-scraps-text">M:10/C:15</span>
+                </div>
+                <button onclick="toggleDungeonMap()" class="px-2.5 py-1 bg-purple-900/40 hover:bg-purple-800 border border-purple-500/30 text-purple-300 font-bold text-[10px] rounded cursor-pointer transition-all">
+                    지도 [TAB]
+                </button>
+            </div>
+        </div>
+
+        <!-- Floating Interaction Tooltip -->
+        <div id="hud-interaction-tooltip" class="hidden absolute top-20 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full border border-yellow-500/40 bg-black/90 text-yellow-400 text-[10px] font-mono font-bold shadow-lg animate-bounce uppercase">
+            [E] 상호작용
+        </div>
+
+        <!-- Playable Tutorial Guide Panel -->
+        <div id="tutorial-guide-panel" class="hidden absolute top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-sm sm:max-w-md p-4 rounded-xl border border-yellow-500/30 bg-black/95 backdrop-blur-md shadow-2xl font-mono text-xs text-gray-100 flex flex-col gap-2">
+            <div class="flex items-center justify-between border-b border-yellow-500/20 pb-1.5">
+                <span class="text-yellow-400 font-black uppercase tracking-wider flex items-center gap-1">
+                    <i data-lucide="help-circle" class="w-4 h-4 text-yellow-400 animate-pulse"></i>
+                    전술 조작 훈련소 (TUTORIAL)
+                </span>
+                <button onclick="skipTutorialInGame()" class="px-2 py-0.5 bg-red-950 hover:bg-red-900 border border-red-800/40 text-red-400 text-[9px] rounded font-bold cursor-pointer transition-colors">
+                    스킵 (SKIP)
+                </button>
+            </div>
+            <div id="tutorial-instruction-text" class="text-gray-300 leading-relaxed text-[11px]">
+                로딩 중...
+            </div>
+            <div class="w-full bg-gray-950 h-1.5 rounded-full overflow-hidden mt-1">
+                <div id="tutorial-progress-bar" class="h-full bg-yellow-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- MAIN GAMEPLAY CANVAS -->
+        <canvas id="game-canvas" class="w-full h-full block bg-[#040306] cursor-crosshair"></canvas>
+
+        <!-- Dynamic Bullet Chamber State Visualizer (Bottom-Left) -->
+        <div id="chamber-dock-left" class="absolute bottom-4 left-4 z-10 bg-black/85 border border-purple-500/30 p-3 rounded-xl backdrop-blur-md shadow-2xl flex flex-col gap-2 pointer-events-none">
+            <div class="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                <span>장전된 약실 (CHAMBER FIFO)</span>
+                <span class="text-[9px] text-yellow-500 font-bold">LEFT 클릭 격발</span>
+            </div>
+            <div class="flex gap-1.5 items-center justify-start min-h-[36px]" id="hud-chamber-icons"></div>
+        </div>
+
+        <!-- TACTICAL IN-GAME REAL-TIME DECK DOCK (Floating Hand Cards overlay) -->
+        <div id="tactical-hand-dock" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl transition-all duration-300 transform translate-y-32 opacity-0 pointer-events-none">
+            <div class="bg-black/95 border-2 border-purple-500/40 rounded-2xl p-4 backdrop-blur-md shadow-2xl flex flex-col gap-3">
+                <div class="flex items-center justify-between border-b border-purple-500/20 pb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                        <span class="text-[11px] font-black text-purple-300 font-mono uppercase tracking-widest flex items-center gap-1.5">
+                            불릿 타임 가동 중 (원소 소모 실시간 장전)
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2 font-mono text-[9px]">
+                        <span class="text-gray-400">약실 적재 / 클릭 제거: </span>
+                        <div id="realtime-staged-chamber-preview" class="flex gap-1"></div>
+                        <button onclick="clearStagedChamber()" class="px-2 py-0.5 bg-red-950 hover:bg-red-900 border border-red-800/30 text-red-400 rounded font-bold cursor-pointer transition-colors">
+                            비우기
+                        </button>
+                        <button onclick="finishRealtimeReload()" class="px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-black rounded-lg tracking-wider transition-transform active:scale-95 cursor-pointer shadow-md">
+                            장전 완료 [R]
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="reload-deck-hand-container" class="card-hand-container">
+                    <!-- Fanned cards rendered dynamically in the gameplay screen bottom -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SYSTEM INTERACTIVE STATION OVERLAY (SHOP, FORGE, ALTAR) -->
+        <div id="system-station-overlay" class="hidden absolute inset-0 z-40 bg-[#030009]/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-black/95 border-2 border-cyan-500/40 rounded-2xl w-full max-w-lg p-5 md:p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-cyan-500/20 pb-3 font-mono">
+                    <h3 id="station-title-text" class="text-base font-black tracking-wider text-cyan-400 uppercase">
+                        상호작용 스테이션
+                    </h3>
+                    <button onclick="closeInteractiveStation()" class="px-3 py-1 bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold text-xs rounded transition-transform active:scale-95 cursor-pointer">
+                        나가기 [ESC]
+                    </button>
+                </div>
+
+                <!-- Shop Contents -->
+                <div id="station-content-shop" class="hidden flex flex-col gap-3 font-mono">
+                    <div class="flex justify-between items-center text-xs text-gray-400">
+                        <span>암시장 전술 보조원 (Merchant)</span>
+                        <span class="text-yellow-400" id="shop-customer-gold">소지 골드: 0G</span>
+                    </div>
+                    <div id="shop-items-container" class="grid grid-cols-1 gap-2.5 max-h-[250px] overflow-y-auto"></div>
+                </div>
+
+                <!-- Forge Customizing Contents -->
+                <div id="station-content-forge" class="hidden flex flex-col gap-3 font-mono">
+                    <span class="text-xs text-gray-400 block">무기 부품 마이크로 슬롯 조립 (Weapon Modular Mod)</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                        <!-- Left: Equipped Parts -->
+                        <div class="bg-cyan-950/15 border border-cyan-500/20 p-2.5 rounded-xl">
+                            <span class="text-[10px] font-black text-cyan-400 block mb-2">무기에 조립된 모듈 (Equipped)</span>
+                            <div id="forge-equipped-list" class="flex flex-col gap-1.5 min-h-[60px]"></div>
+                        </div>
+                        <!-- Right: Owned Inventory -->
+                        <div class="bg-black/60 border border-white/5 p-2.5 rounded-xl">
+                            <span class="text-[10px] font-black text-gray-400 block mb-2">여분 보조 부품 창고 (Inventory)</span>
+                            <div id="forge-inventory-list" class="flex flex-col gap-1.5 min-h-[60px] max-h-[120px] overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Craft Mod Parts -->
+                    <div class="bg-black/90 p-3 rounded-xl border border-white/5 flex flex-col gap-2">
+                        <span class="text-[10px] font-black text-gray-400">보조 장비 부품 설계도 제작 (Craft Modules)</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="craftPart('CHOKE')" class="p-2 bg-purple-950/40 hover:bg-purple-900 border border-purple-800/40 rounded text-[10px] text-left flex flex-col justify-between cursor-pointer">
+                                <span class="font-bold text-purple-300">합금 초크 총열</span>
+                                <span class="text-[8px] text-gray-400 mt-0.5">집탄율 +30%, 소진: 스크랩 금속 5</span>
+                            </button>
+                            <button onclick="craftPart('AUTO_TRIGGER')" class="p-2 bg-purple-950/40 hover:bg-purple-900 border border-purple-800/40 rounded text-[10px] text-left flex flex-col justify-between cursor-pointer">
+                                <span class="font-bold text-purple-300">신경 감응 트리거</span>
+                                <span class="text-[8px] text-gray-400 mt-0.5">연사 속도 +25%, 소진: 결정체 10</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Altar Contents -->
+                <div id="station-content-altar" class="hidden flex flex-col gap-3 text-center font-mono">
+                    <i data-lucide="sparkles" class="w-10 h-10 text-yellow-400 mx-auto animate-bounce"></i>
+                    <p id="altar-prompt-text" class="text-xs text-gray-300 max-w-sm mx-auto leading-relaxed">
+                        정적을 깨는 수수께끼 심연 결정체가 가동 중입니다. 에너지를 자극하여 불완전한 파편 자원들을 주입받으시겠습니까?
+                    </p>
+                    <div class="flex gap-2 justify-center mt-3">
+                        <button onclick="acceptAltarReward(true)" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-black font-black text-xs rounded transition-transform cursor-pointer">
+                            [수락] 자극하기
+                        </button>
+                        <button onclick="closeInteractiveStation()" class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold text-xs rounded transition-transform cursor-pointer">
+                            [거절] 그대로 두기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DUNGEON MINIMAP OVERLAY -->
+        <div id="dungeon-map-overlay" class="hidden absolute inset-0 z-30 bg-black/95 backdrop-blur-md flex flex-col p-6 overflow-y-auto">
+            <div class="max-w-xl w-full mx-auto flex flex-col gap-4 my-auto">
+                <div class="flex items-center justify-between border-b border-purple-500/20 pb-3 font-mono">
+                    <div>
+                        <h2 class="text-base font-black tracking-wider text-purple-400 uppercase flex items-center gap-1.5">
+                            <i data-lucide="milestone" class="w-5 h-5 text-purple-400 animate-pulse"></i>
+                            심연 층계 연동 항로 지도 (DUNGEON PATHMAP)
+                        </h2>
+                        <p class="text-[10px] text-gray-400">지선 선택을 거쳐 상인, 대장간, 혹은 정예 파수기가 출몰하는 루트를 돌파해 심연을 하강하십시오.</p>
+                    </div>
+                    <button onclick="toggleDungeonMap()" class="px-3 py-1 bg-purple-950 hover:bg-purple-900 border border-purple-500/30 text-purple-300 font-bold text-xs rounded cursor-pointer">
+                        끄기 [TAB]
+                    </button>
+                </div>
+
+                <div class="bg-purple-950/10 border border-purple-500/20 rounded-2xl p-6 relative flex flex-col items-center gap-6" id="dungeon-map-nodes-container"></div>
+
+                <div class="flex flex-wrap gap-4 items-center justify-center text-[10px] text-gray-400 font-mono bg-black border border-white/5 p-3 rounded-xl">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-600"></span> [C] 전투</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span> [S] 상인</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> [F] 대장간</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> [E] 사건 수수께끼</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-pink-500 animate-ping"></span> [B] 보스</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT GAME LOGIC -->
+    <script>
+        class AudioSynth {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            play(type) {
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    
+                    switch(type) {
+                        case "shoot":
+                            const oscShoot = this.ctx.createOscillator();
+                            const oscRumble = this.ctx.createOscillator();
+                            const gainShoot = this.ctx.createGain();
+                            const filter = this.ctx.createBiquadFilter();
+                            
+                            oscShoot.type = 'sawtooth';
+                            oscShoot.frequency.setValueAtTime(320, now);
+                            oscShoot.frequency.exponentialRampToValueAtTime(30, now + 0.22);
+                            
+                            oscRumble.type = 'triangle';
+                            oscRumble.frequency.setValueAtTime(80, now);
+                            oscRumble.frequency.exponentialRampToValueAtTime(20, now + 0.3);
+
+                            filter.type = 'lowpass';
+                            filter.frequency.setValueAtTime(1200, now);
+                            filter.frequency.exponentialRampToValueAtTime(100, now + 0.25);
+
+                            gainShoot.gain.setValueAtTime(0.25, now);
+                            gainShoot.gain.exponentialRampToValueAtTime(0.005, now + 0.28);
+                            
+                            oscShoot.connect(filter);
+                            oscRumble.connect(filter);
+                            filter.connect(gainShoot);
+                            gainShoot.connect(this.ctx.destination);
+                            
+                            oscShoot.start(now);
+                            oscRumble.start(now);
+                            oscShoot.stop(now + 0.3);
+                            oscRumble.stop(now + 0.3);
+                            break;
+                            
+                        case "dodge":
+                            const bufferSize = this.ctx.sampleRate * 0.16;
+                            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                            const data = buffer.getChannelData(0);
+                            for (let i = 0; i < bufferSize; i++) {
+                                data[i] = Math.random() * 2 - 1;
+                            }
+                            const noiseNode = this.ctx.createBufferSource();
+                            noiseNode.buffer = buffer;
+                            const noiseFilter = this.ctx.createBiquadFilter();
+                            noiseFilter.type = "bandpass";
+                            noiseFilter.frequency.value = 850;
+                            const gainDodge = this.ctx.createGain();
+                            gainDodge.gain.setValueAtTime(0.12, now);
+                            gainDodge.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+                            noiseNode.connect(noiseFilter);
+                            noiseFilter.connect(gainDodge);
+                            gainDodge.connect(this.ctx.destination);
+                            noiseNode.start(now);
+                            noiseNode.stop(now + 0.17);
+                            break;
+                            
+                        case "hit_player":
+                            const oscGrunt = this.ctx.createOscillator();
+                            const oscImpact = this.ctx.createOscillator();
+                            const gainGrunt = this.ctx.createGain();
+                            
+                            oscGrunt.type = 'sawtooth';
+                            oscGrunt.frequency.setValueAtTime(160, now);
+                            oscGrunt.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+                            
+                            oscImpact.type = 'triangle';
+                            oscImpact.frequency.setValueAtTime(90, now);
+                            oscImpact.frequency.setValueAtTime(30, now + 0.1);
+
+                            gainGrunt.gain.setValueAtTime(0.35, now);
+                            gainGrunt.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                            
+                            oscGrunt.connect(gainGrunt);
+                            oscImpact.connect(gainGrunt);
+                            gainGrunt.connect(this.ctx.destination);
+                            
+                            oscGrunt.start(now);
+                            oscImpact.start(now);
+                            oscGrunt.stop(now + 0.19);
+                            oscImpact.stop(now + 0.19);
+                            break;
+
+                        case "hit_enemy":
+                            const oscEnemy = this.ctx.createOscillator();
+                            const gainEnemy = this.ctx.createGain();
+                            oscEnemy.type = 'sawtooth';
+                            oscEnemy.frequency.setValueAtTime(450, now);
+                            oscEnemy.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+                            gainEnemy.gain.setValueAtTime(0.08, now);
+                            gainEnemy.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                            oscEnemy.connect(gainEnemy);
+                            gainEnemy.connect(this.ctx.destination);
+                            oscEnemy.start(now);
+                            oscEnemy.stop(now + 0.09);
+                            break;
+
+                        case "casing":
+                            const oscCasing = this.ctx.createOscillator();
+                            const gainCasing = this.ctx.createGain();
+                            oscCasing.type = 'sine';
+                            oscCasing.frequency.setValueAtTime(2600, now);
+                            oscCasing.frequency.exponentialRampToValueAtTime(2200, now + 0.06);
+                            gainCasing.gain.setValueAtTime(0.03, now);
+                            gainCasing.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                            oscCasing.connect(gainCasing);
+                            gainCasing.connect(this.ctx.destination);
+                            oscCasing.start(now);
+                            oscCasing.stop(now + 0.07);
+                            break;
+
+                        case "reaction":
+                            const oscR1 = this.ctx.createOscillator();
+                            const oscR2 = this.ctx.createOscillator();
+                            const gainR = this.ctx.createGain();
+                            oscR1.type = 'sawtooth'; oscR2.type = 'sine';
+                            oscR1.frequency.setValueAtTime(440, now);
+                            oscR1.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+                            oscR2.frequency.setValueAtTime(880, now);
+                            oscR2.frequency.exponentialRampToValueAtTime(330, now + 0.25);
+                            gainR.gain.setValueAtTime(0.2, now);
+                            gainR.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                            oscR1.connect(gainR); oscR2.connect(gainR);
+                            gainR.connect(this.ctx.destination);
+                            oscR1.start(now); oscR2.start(now);
+                            oscR1.stop(now + 0.45); oscR2.stop(now + 0.45);
+                            break;
+                        case "reload":
+                            const oscL = this.ctx.createOscillator();
+                            const gainL = this.ctx.createGain();
+                            oscL.type = 'square';
+                            oscL.frequency.setValueAtTime(850, now);
+                            oscL.frequency.setValueAtTime(1100, now + 0.05);
+                            gainL.gain.setValueAtTime(0.04, now);
+                            gainL.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                            oscL.connect(gainL);
+                            gainL.connect(this.ctx.destination);
+                            oscL.start(now);
+                            oscL.stop(now + 0.09);
+                            break;
+                        case "clear":
+                            const oscC = this.ctx.createOscillator();
+                            const gainC = this.ctx.createGain();
+                            oscC.type = 'sine';
+                            oscC.frequency.setValueAtTime(523.25, now);
+                            oscC.frequency.setValueAtTime(659.25, now + 0.1);
+                            oscC.frequency.setValueAtTime(783.99, now + 0.2);
+                            gainC.gain.setValueAtTime(0.08, now);
+                            gainC.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                            oscC.connect(gainC);
+                            gainC.connect(this.ctx.destination);
+                            oscC.start(now);
+                            oscC.stop(now + 0.38);
+                            break;
+                    }
+                } catch (e) {
+                    console.warn("Synth exception:", e);
+                }
+            }
+        }
+        const synth = new AudioSynth();
+
+        const ElementType = {
+            FIRE: "FIRE",
+            ICE: "ICE",
+            LIGHTNING: "LIGHTNING",
+            VOID: "VOID"
+        };
+
+        const BASE_CARDS = [
+            { id: "c_fire", name: "화염 원소 탄환", shortName: "화염", element: ElementType.FIRE, color: "#f97316", icon: "🔥", text: "화염 낙인 부착. 냉기와 만나면 열충격, 뇌전과 만나면 플라즈마 연쇄", cost: 12 },
+            { id: "c_ice", name: "냉기 원소 탄환", shortName: "냉기", element: ElementType.ICE, color: "#38bdf8", icon: "❄️", text: "냉기 낙인 부착. 화염과 만나면 열충격, 공허와 만나면 심연동결", cost: 12 },
+            { id: "c_light", name: "뇌전 원소 탄환", shortName: "뇌전", element: ElementType.LIGHTNING, color: "#eab308", icon: "⚡", text: "뇌전 낙인 부착. 화염과 만나면 플라즈마 연쇄", cost: 15 },
+            { id: "c_void", name: "공허 원소 탄환", shortName: "공허", element: ElementType.VOID, color: "#a855f7", icon: "🌀", text: "공허 낙인 부착. 냉기와 만나면 심연동결", cost: 15 }
+        ];
+
+        const ELEMENT_LABELS = {
+            FIRE: { name: "화염", icon: "🔥", color: "#f97316" },
+            ICE: { name: "냉기", icon: "❄️", color: "#38bdf8" },
+            LIGHTNING: { name: "뇌전", icon: "⚡", color: "#eab308" },
+            VOID: { name: "공허", icon: "🌀", color: "#a855f7" }
+        };
+
+        function createElementStock(fire = 0, ice = 0, lightning = 0, voidStock = 0) {
+            return {
+                [ElementType.FIRE]: fire,
+                [ElementType.ICE]: ice,
+                [ElementType.LIGHTNING]: lightning,
+                [ElementType.VOID]: voidStock
+            };
+        }
+
+        function ensureElementStock() {
+            if (!playerStats.elementCards) {
+                playerStats.elementCards = createElementStock(0, 0, 0, 0);
+            }
+            BASE_CARDS.forEach(card => {
+                if (typeof playerStats.elementCards[card.element] !== "number") {
+                    playerStats.elementCards[card.element] = 0;
+                }
+            });
+            return playerStats.elementCards;
+        }
+
+        function getCardTemplateByElement(element) {
+            return BASE_CARDS.find(card => card.element === element) || BASE_CARDS[0];
+        }
+
+        function stripReloadMeta(bullet) {
+            const cleaned = { ...bullet };
+            delete cleaned.reloadFresh;
+            delete cleaned.fromExisting;
+            return cleaned;
+        }
+
+        function refundFreshStagedBullets(list) {
+            const stock = ensureElementStock();
+            list.forEach(bullet => {
+                if (bullet && bullet.reloadFresh) {
+                    stock[bullet.element] = (stock[bullet.element] || 0) + 1;
+                }
+            });
+        }
+
+        function addElementStock(element, amount, notify = true) {
+            const stock = ensureElementStock();
+            stock[element] = (stock[element] || 0) + amount;
+            if (notify) {
+                const info = ELEMENT_LABELS[element];
+                showFloatingNotification(`${info.name} 원소 카드 +${amount} 획득! 현재 ${stock[element]}개`);
+            }
+            syncHUDBars();
+        }
+
+        function randomElementCard() {
+            return BASE_CARDS[Math.floor(Math.random() * BASE_CARDS.length)];
+        }
+
+        const BASE_PARTS = [
+            { id: "part_choke", name: "합금 초크 총열 (Barrel)", type: "BARREL", multiplier: { spread: 0.65, damage: 1.15 }, description: "탄알 퍼짐각을 35% 억제하고 집탄율과 위력을 올립니다.", cost: 25 },
+            { id: "part_trigger", name: "신경 감응 트리거 (Trigger)", type: "TRIGGER", multiplier: { fireRate: 0.72 }, description: "샷건 격발 쿨타임을 28% 감소시켜 연속 사격을 돕습니다.", cost: 30 },
+            { id: "part_stock", name: "경량 피스톤 개머리판 (Stock)", type: "STOCK", multiplier: { recoil: 0.50 }, description: "격발 시 밀리는 물리 밀림 현상을 반절로 상쇄합니다.", cost: 20 }
+        ];
+
+        const ZOOM_FACTOR = 1.0;
+
+        let currentScreen = "START";
+        let isDungeonMapOpen = false;
+        let selectedCharacter = "EXPLORER";
+        let difficultyLevel = "NORMAL";
+
+        // Tutorial variables
+        let isTutorialMode = false;
+        let tutorialStep = 0;
+        let tutorialRollsCount = 0;
+        let tutorialMarker = { x: 450, y: 220, radius: 25 };
+        let tutorialDummySpawned = false;
+
+        // Player Stats
+        let playerStats = {
+            hp: 100, maxHp: 100,
+            gold: 40, floor: 1, kills: 0,
+            scraps: { metal: 10, crystal: 15, core: 1 },
+            elementCards: createElementStock(10, 8, 5, 4)
+        };
+
+        let deck = [];
+        let chamber = [];
+        let stagedChamber = [];
+        let equippedParts = [];
+        let ownedParts = [];
+
+        // Map Route Navigation
+        let routeNodes = [];
+        let activeRoom = null;
+        let isCorridor = false;
+        let corridorProgress = 0;
+        let corridorTarget = null;
+
+        // Permanent Upgrades Save File
+        let metaProgress = {
+            crystal: 0,
+            scraps: 0,
+            unlocked_upgrades: {
+                extra_max_hp: 0,
+                shop_discount: 0,
+                starting_card_slots: 0
+            }
+        };
+
+        const keys = { w: false, a: false, s: false, d: false, space: false, r: false, e: false };
+        let mousePos = { x: 0, y: 0 };
+        let isBulletTime = false;
+        let isStationActive = false;
+        let activeStationType = null;
+
+        const engineState = {
+            player: {
+                x: 150, y: 250, vx: 0, vy: 0, radius: 15, direction: 1,
+                rollVx: 0, rollVy: 0, rollDuration: 0, rollCooldown: 0,
+                isInvulnerable: false,
+                fireCooldown: 0, speedBuffDuration: 0
+            },
+            projectiles: [],
+            enemies: [],
+            particles: [],
+            floatingTexts: [],
+            obstacles: [],
+            groundItems: [],
+            stations: [],
+            gateways: [],
+            roomBounds: { w: 1000, h: 600 },
+            camera: { x: 0, y: 0 },
+            screenShake: 0,
+            recoilOffset: 0,
+            muzzleFlashTimer: 0,
+            muzzleFlashAngle: 0,
+            hitOverlayTimer: 0,
+            enemiesKilledInThisRoom: 0,
+            totalEnemiesSpawned: 0,
+            combatStart: false,
+            combatClearedTriggered: false
+        };
+
+        let canvas, ctx;
+
+        window.onload = function() {
+            canvas = document.getElementById("game-canvas");
+            ctx = canvas.getContext("2d");
+            
+            if (localStorage.getItem("abyss_meta_progression_v25")) {
+                try {
+                    metaProgress = JSON.parse(localStorage.getItem("abyss_meta_progression_v25"));
+                } catch(e) {
+                    console.error("Meta parser error:", e);
+                }
+            } else {
+                metaProgress.crystal = 24;
+                metaProgress.scraps = 15;
+                saveMetaProgress();
+            }
+
+            syncMetaShopUI();
+
+            window.addEventListener("keydown", handleKeyDown);
+            window.addEventListener("keyup", handleKeyUp);
+            window.addEventListener("mousemove", handleMouseMove);
+            window.addEventListener("mousedown", handleMouseDown);
+            window.addEventListener("resize", resizeCanvas);
+
+            selectCharacter("EXPLORER");
+            lucide.createIcons();
+
+            requestAnimationFrame(gameLoop);
+        };
+
+        function saveMetaProgress() {
+            localStorage.setItem("abyss_meta_progression_v25", JSON.stringify(metaProgress));
+        }
+
+        function syncMetaShopUI() {
+            document.getElementById("meta-crystal-count").innerText = metaProgress.crystal;
+            document.getElementById("meta-scrap-count").innerText = metaProgress.scraps;
+
+            const hpVal = metaProgress.unlocked_upgrades.extra_max_hp || 0;
+            const discVal = metaProgress.unlocked_upgrades.shop_discount || 0;
+            const slotVal = metaProgress.unlocked_upgrades.starting_card_slots || 0;
+
+            document.getElementById("legacy-hp-status").innerText = `현재 강화도: ${hpVal}/5 (${hpVal*10} HP 추가됨)`;
+            document.getElementById("legacy-discount-status").innerText = discVal > 0 ? "잠금해제 완료 (스크랩 보충)" : "미해금 (상점 잠금해제)";
+            document.getElementById("legacy-slots-status").innerText = slotVal > 0 ? "잠금해제 완료 (시작 보너스 금속+3)" : "미해금 (소재 주머니 확장)";
+        }
+
+        function buyMetaUpgrade(field, cost) {
+            synth.init();
+            if (metaProgress.crystal >= cost) {
+                if (field === 'extra_max_hp' && (metaProgress.unlocked_upgrades.extra_max_hp || 0) >= 5) {
+                    showFloatingNotification("최대 강화 단계(5)에 이미 도달했습니다!");
+                    return;
+                }
+                if (metaProgress.unlocked_upgrades[field] && field !== 'extra_max_hp') {
+                    showFloatingNotification("이미 한 차례 잠금해제한 유산 항목입니다!");
+                    return;
+                }
+
+                metaProgress.crystal -= cost;
+                if (field === 'extra_max_hp') {
+                    metaProgress.unlocked_upgrades.extra_max_hp = (metaProgress.unlocked_upgrades.extra_max_hp || 0) + 1;
+                } else {
+                    metaProgress.unlocked_upgrades[field] = 1;
+                }
+                
+                synth.play("clear");
+                saveMetaProgress();
+                syncMetaShopUI();
+                showFloatingNotification("심연 영구 유산 능력을 강화 장착했습니다!");
+            } else {
+                synth.play("hit_player");
+                showFloatingNotification("결정체가 부족해 유산을 계승할 수 없습니다!");
+            }
+        }
+
+        function selectCharacter(type) {
+            selectedCharacter = type;
+            ["EXPLORER", "SENTINEL", "OVERSEER"].forEach(c => {
+                const card = document.getElementById(`char-card-${c}`);
+                if (c === type) {
+                    card.className = "group relative p-4 rounded-xl border border-purple-500 bg-purple-950/20 cursor-pointer transition-all flex flex-col justify-between h-48 shadow-lg shadow-purple-500/10";
+                } else {
+                    card.className = "group relative p-4 rounded-xl border border-gray-800 bg-black/40 cursor-pointer transition-all hover:border-purple-500/40 flex flex-col justify-between h-48";
+                }
+            });
+            synth.play("reload");
+        }
+
+        function setDifficulty(level) {
+            difficultyLevel = level;
+            const normBtn = document.getElementById("diff-btn-NORMAL");
+            const hardBtn = document.getElementById("diff-btn-HARD");
+            if (level === "NORMAL") {
+                normBtn.className = "px-3 py-1.5 rounded bg-purple-600 text-white font-bold text-xs cursor-pointer";
+                hardBtn.className = "px-3 py-1.5 rounded bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold text-xs cursor-pointer";
+            } else {
+                normBtn.className = "px-3 py-1.5 rounded bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold text-xs cursor-pointer";
+                hardBtn.className = "px-3 py-1.5 rounded bg-red-600 text-white font-bold text-xs cursor-pointer";
+            }
+            synth.play("reload");
+        }
+
+        function showFloatingNotification(text) {
+            if (currentScreen === "GAMEPLAY") {
+                engineState.floatingTexts.push({
+                    x: engineState.player.x,
+                    y: engineState.player.y - 30,
+                    text: text,
+                    color: "#f59e0b",
+                    vy: -1.0,
+                    life: 90
+                });
+            } else {
+                const div = document.createElement("div");
+                div.className = "absolute top-5 left-1/2 -translate-x-1/2 z-50 bg-purple-900/90 border border-purple-400 text-purple-200 text-xs px-6 py-3 rounded-xl shadow-2xl font-mono text-center pointer-events-none animate-bounce";
+                div.innerText = text;
+                document.body.appendChild(div);
+                setTimeout(() => div.remove(), 2500);
+            }
+        }
+
+        function changeScreen(scr) {
+            currentScreen = scr;
+            if (scr === "START") {
+                document.getElementById("screen-start").classList.remove("hidden");
+                document.getElementById("screen-gameplay").classList.add("hidden");
+            } else {
+                document.getElementById("screen-start").classList.add("hidden");
+                document.getElementById("screen-gameplay").classList.remove("hidden");
+            }
+        }
+
+        function startNewExploration() {
+            synth.play("clear");
+            
+            const extrHp = (metaProgress.unlocked_upgrades.extra_max_hp || 0) * 10;
+            const extrGold = (metaProgress.unlocked_upgrades.shop_discount || 0) * 15;
+            const extrScraps = (metaProgress.unlocked_upgrades.starting_card_slots || 0) * 3;
+
+            let baseHp = 100;
+            if (selectedCharacter === "SENTINEL") baseHp = 130;
+            else if (selectedCharacter === "OVERSEER") baseHp = 90;
+
+            playerStats = {
+                hp: baseHp + extrHp,
+                maxHp: baseHp + extrHp,
+                gold: 40 + extrGold,
+                score: 0,
+                floor: 1,
+                kills: 0,
+                scraps: {
+                    metal: 10 + extrScraps,
+                    crystal: 15 + extrScraps,
+                    core: selectedCharacter === "OVERSEER" ? 2 : 1
+                },
+                // 원소 카드는 무한 덱이 아니라 실제 재고입니다. 장전할 때 1발마다 1개씩 소모됩니다.
+                elementCards: createElementStock(
+                    10 + extrScraps,
+                    8 + extrScraps,
+                    selectedCharacter === "OVERSEER" ? 7 : 5,
+                    selectedCharacter === "SENTINEL" ? 6 : 4
+                )
+            };
+            ensureElementStock();
+
+            // 덱 리스트는 더 이상 무한 장전 카드 묶음으로 쓰지 않습니다. 원소 재고 UI는 BASE_CARDS를 기준으로 표시합니다.
+            deck = [];
+
+            // 시작 약실 2발은 기본 지급된 장전탄입니다. 이후 장전부터는 원소 카드 재고를 소비합니다.
+            chamber = [
+                { ...BASE_CARDS[0], id: "st_ch1" },
+                { ...BASE_CARDS[1], id: "st_ch2" }
+            ];
+
+            equippedParts = [
+                { ...BASE_PARTS[1], id: "eq_barrel" }
+            ];
+            ownedParts = [];
+
+            generateExpeditionMap();
+
+            const skipTutorial = document.getElementById("skip-tutorial-check").checked;
+            if (skipTutorial) {
+                isTutorialMode = false;
+                document.getElementById("tutorial-guide-panel").classList.add("hidden");
+
+                routeNodes[0].visited = true;
+                routeNodes[0].clear = true;
+                const nextNode = routeNodes[1];
+                nextNode.visited = true;
+                activeRoom = nextNode;
+                
+                isCorridor = true;
+                corridorTarget = activeRoom;
+            } else {
+                isTutorialMode = true;
+                tutorialStep = 0;
+                tutorialRollsCount = 0;
+                tutorialDummySpawned = false;
+                document.getElementById("tutorial-guide-panel").classList.remove("hidden");
+                
+                const firstNode = routeNodes[0];
+                firstNode.visited = true;
+                activeRoom = firstNode;
+                isCorridor = false;
+            }
+            
+            isBulletTime = false;
+            isDungeonMapOpen = false;
+            closeInteractiveStation();
+
+            changeScreen("GAMEPLAY");
+            syncHUDBars();
+            initEnginePhysics();
+            resizeCanvas();
+        }
+
+        function skipTutorialInGame() {
+            synth.play("clear");
+            isTutorialMode = false;
+            document.getElementById("tutorial-guide-panel").classList.add("hidden");
+            showFloatingNotification("훈련을 생략하고 본부 활성 루트로 직행합니다!");
+
+            routeNodes[0].clear = true;
+            isCorridor = true;
+            corridorTarget = routeNodes[1];
+            setupRoomState();
+        }
+
+        function updateTutorialUI() {
+            if (!isTutorialMode) {
+                document.getElementById("tutorial-guide-panel").classList.add("hidden");
+                return;
+            }
+            document.getElementById("tutorial-guide-panel").classList.remove("hidden");
+            const textEl = document.getElementById("tutorial-instruction-text");
+            const barEl = document.getElementById("tutorial-progress-bar");
+            
+            let pct = 0;
+            let text = "";
+            
+            switch(tutorialStep) {
+                case 0:
+                    pct = 15;
+                    text = "<strong>[1단계: 기동 훈련]</strong> <br><span class='text-yellow-400 font-bold'>W, A, S, D</span> 키를 입력해 캐릭터를 움직이십시오. 중앙에 빛나는 <span class='text-yellow-400 font-bold'>노란색 훈련 마커 영역</span> 안으로 진입하십시오.";
+                    break;
+                case 1:
+                    pct = 40;
+                    text = `<strong>[2단계: 회피 훈련]</strong> <br>적의 공격을 무적으로 회피하기 위해 <span class='text-yellow-400 font-bold'>SPACEBAR</span> 키를 입력해 3회 회피 구르기를 시전하십시오. (진행도: ${tutorialRollsCount}/3)`;
+                    break;
+                case 2:
+                    pct = 65;
+                    text = "<strong>[3단계: 전술 장전]</strong> <br>탄약이 없을 땐 <span class='text-yellow-400 font-bold'>R</span> 키를 입력해 전술 장전을 활성화하십시오. 불릿 타임 속에서 화면 하단 카드 중 <span class='text-orange-400 font-bold'>화염 탄환</span>과 <span class='text-sky-400 font-bold'>냉기 탄환</span>을 클릭하여 적재하십시오. 이때 원소 재고가 1개씩 줄어듭니다. 장전 완료[R]를 누르십시오.";
+                    break;
+                case 3:
+                    pct = 85;
+                    text = "<strong>[4단계: 상태이상 부착 및 열충격 피격 훈련]</strong> <br>소환된 표적에게 <span class='text-orange-400 font-bold'>화염 탄환을 맞추어 부착한 후, 연이어 냉기 탄환을 명중</span>시켜 <strong>열충격(Thermal Shock)</strong> 시너지를 유도하십시오!";
+                    break;
+                case 4:
+                    pct = 100;
+                    text = "<strong>[5단계: 차원문 전송]</strong> <br>모든 전술 기초 기법을 완수했습니다! 이제 우측에 출현한 <span class='text-purple-400 font-bold'>보랏빛 관문 영역</span>에 진입해 고대 심연 탐사를 개시하십시오.";
+                    break;
+            }
+            
+            textEl.innerHTML = text;
+            barEl.style.width = `${pct}%`;
+            lucide.createIcons();
+        }
+
+        function generateExpeditionMap() {
+            routeNodes = [
+                { id: 0, depth: 0, type: "COMBAT", visited: false, clear: false, label: "01 기동 전술 훈련소" },
+                { id: 1, depth: 1, type: "FORGE", visited: false, clear: false, label: "02 미세 조립 대장간", parents: [0] },
+                { id: 2, depth: 1, type: "SHOP", visited: false, clear: false, label: "02 비밀 암시장", parents: [0] },
+                { id: 3, depth: 2, type: "COMBAT", visited: false, clear: false, label: "03 격리 장벽 파수 구역", parents: [1, 2] },
+                { id: 4, depth: 3, type: "ALTAR", visited: false, clear: false, label: "04 침식의 미스테리 제단", parents: [3] },
+                { id: 5, depth: 3, type: "SHOP", visited: false, clear: false, label: "04 전초기지 간이 상점", parents: [3] },
+                { id: 6, depth: 4, type: "BOSS", visited: false, clear: false, label: "05 심연 핵 파수 가디언 (BOSS)", parents: [4, 5] }
+            ];
+
+            activeRoom = routeNodes[0];
+            activeRoom.visited = true;
+        }
+
+        function buildDungeonMapUI() {
+            const cont = document.getElementById("dungeon-map-nodes-container");
+            cont.innerHTML = "";
+
+            const columns = {};
+            routeNodes.forEach(node => {
+                if (!columns[node.depth]) columns[node.depth] = [];
+                columns[node.depth].push(node);
+            });
+
+            Object.keys(columns).sort().forEach(depth => {
+                const depthDiv = document.createElement("div");
+                depthDiv.className = "flex justify-center gap-6 w-full py-1";
+                
+                columns[depth].forEach(node => {
+                    const nodeBtn = document.createElement("button");
+                    
+                    let bg = "bg-gray-950 border-gray-800 text-gray-500";
+                    if (node.visited && !node.clear) {
+                        bg = "bg-purple-900 border-purple-400 text-white shadow-lg animate-pulse";
+                    } else if (node.clear) {
+                        bg = "bg-emerald-950/40 border-emerald-500 text-emerald-400";
+                    } else if (activeRoom && activeRoom.clear) {
+                        const isAvailable = node.parents && node.parents.includes(activeRoom.id);
+                        if (isAvailable) {
+                            bg = "bg-purple-950/60 border-purple-700 text-purple-200 cursor-pointer hover:scale-105 hover:bg-purple-900/50";
+                            nodeBtn.onclick = () => selectNextNodePath(node);
+                        }
+                    }
+
+                    nodeBtn.className = `px-3 py-2 border-2 rounded-xl text-[10px] font-mono flex flex-col items-center justify-center w-36 text-center transition-all ${bg}`;
+                    
+                    let iconStr = "⚔️";
+                    if (node.type === "SHOP") iconStr = "🛒";
+                    if (node.type === "FORGE") iconStr = "🛠️";
+                    if (node.type === "ALTAR") iconStr = "🔮";
+                    if (node.type === "BOSS") iconStr = "💀";
+
+                    nodeBtn.innerHTML = `
+                        <span class="text-xs mb-1">${iconStr}</span>
+                        <span class="font-bold block tracking-tight truncate w-full">${node.label}</span>
+                        <span class="text-[8px] text-gray-400 font-mono">${node.clear ? "완료됨" : "진입 가능"}</span>
+                    `;
+                    depthDiv.appendChild(nodeBtn);
+                });
+
+                cont.appendChild(depthDiv);
+            });
+        }
+
+        function selectNextNodePath(targetNode) {
+            if (isCorridor) return;
+            synth.play("clear");
+            
+            targetNode.visited = true;
+            corridorProgress = 0;
+            isCorridor = true;
+            corridorTarget = targetNode;
+            
+            isDungeonMapOpen = false;
+            document.getElementById("dungeon-map-overlay").classList.add("hidden");
+
+            setupRoomState();
+        }
+
+        function toggleDungeonMap() {
+            if (currentScreen !== "GAMEPLAY") return;
+            isDungeonMapOpen = !isDungeonMapOpen;
+            if (isDungeonMapOpen) {
+                buildDungeonMapUI();
+                document.getElementById("dungeon-map-overlay").classList.remove("hidden");
+            } else {
+                document.getElementById("dungeon-map-overlay").classList.add("hidden");
+            }
+        }
+
+        function setupRoomState() {
+            const s = engineState;
+            s.projectiles = [];
+            s.enemies = [];
+            s.particles = [];
+            s.floatingTexts = [];
+            s.obstacles = [];
+            s.groundItems = [];
+            s.stations = [];
+            s.gateways = [];
+            s.enemiesKilledInThisRoom = 0;
+            s.totalEnemiesSpawned = 0;
+            s.combatStart = false;
+            s.combatClearedTriggered = false;
+
+            if (isTutorialMode) {
+                s.roomBounds = { w: 900, h: 500 };
+                s.player.x = 120;
+                s.player.y = 250;
+                s.player.vx = 0;
+                s.player.vy = 0;
+                
+                tutorialMarker.x = 450;
+                tutorialMarker.y = 250;
+                
+                updateTutorialUI();
+                syncHUDBars();
+                return;
+            }
+
+            if (isCorridor) {
+                s.roomBounds = { w: 1200, h: 300 };
+                s.player.x = 80;
+                s.player.y = 150;
+                s.player.vx = 0; s.player.vy = 0;
+                
+                for (let i = 0; i < 6; i++) {
+                    s.obstacles.push({
+                        x: 200 + i * 180,
+                        y: Math.random() < 0.5 ? 40 : 260,
+                        radius: 20 + Math.random() * 15,
+                        color: "#2e1a47"
+                    });
+                }
+
+                scatterElementForage(2);
+
+                s.gateways.push({
+                    id: "corridor_exit",
+                    x: 1120,
+                    y: 150,
+                    radius: 30,
+                    color: "#a855f7",
+                    name: corridorTarget.label,
+                    targetNode: corridorTarget
+                });
+
+                showFloatingNotification("차원 통로를 횡단하여 차기 게이트웨이로 도달하십시오.");
+                syncHUDBars();
+                return;
+            }
+
+            activeRoom = corridorTarget || routeNodes[0];
+            s.roomBounds = { w: 1000, h: 600 };
+            s.player.x = 150;
+            s.player.y = 300;
+            s.player.vx = 0; s.player.vy = 0;
+
+            s.obstacles.push({ x: 350, y: 180, radius: 40, color: "#1e1b4b" });
+            s.obstacles.push({ x: 350, y: 420, radius: 40, color: "#1e1b4b" });
+            s.obstacles.push({ x: 650, y: 300, radius: 45, color: "#1e1b4b" });
+            if (activeRoom.type === "COMBAT" || activeRoom.type === "BOSS") scatterElementForage(activeRoom.type === "BOSS" ? 4 : 3);
+
+            if (activeRoom.type === "SHOP") {
+                s.stations.push({
+                    id: "shop_npc",
+                    type: "SHOP",
+                    x: 500,
+                    y: 300,
+                    radius: 25,
+                    color: "#f59e0b",
+                    name: "암시장 무전 거래 보조원"
+                });
+            } else if (activeRoom.type === "FORGE") {
+                s.stations.push({
+                    id: "forge_npc",
+                    type: "FORGE",
+                    x: 500,
+                    y: 300,
+                    radius: 25,
+                    color: "#22d3ee",
+                    name: "샷건 조립 모듈 대장간"
+                });
+            } else if (activeRoom.type === "ALTAR") {
+                s.stations.push({
+                    id: "altar_npc",
+                    type: "ALTAR",
+                    x: 500,
+                    y: 300,
+                    radius: 25,
+                    color: "#ec4899",
+                    name: "공명 반응 유물 제단"
+                });
+            } else if (activeRoom.type === "COMBAT" || activeRoom.type === "BOSS") {
+                s.combatStart = false;
+            }
+
+            syncHUDBars();
+        }
+
+        function scatterElementForage(count = 2) {
+            const s = engineState;
+            for (let i = 0; i < count; i++) {
+                const card = randomElementCard();
+                s.groundItems.push({
+                    type: "ELEMENT_CARD",
+                    element: card.element,
+                    x: 260 + Math.random() * Math.max(120, s.roomBounds.w - 520),
+                    y: 90 + Math.random() * Math.max(80, s.roomBounds.h - 180),
+                    amount: 1 + Math.floor(Math.random() * 3),
+                    radius: 8,
+                    color: card.color
+                });
+            }
+        }
+
+        function initEnginePhysics() {
+            engineState.projectiles = [];
+            engineState.enemies = [];
+            engineState.particles = [];
+            engineState.floatingTexts = [];
+            engineState.obstacles = [];
+            engineState.groundItems = [];
+            engineState.stations = [];
+            engineState.gateways = [];
+            
+            setupRoomState();
+        }
+
+        function handleKeyDown(e) {
+            if (currentScreen !== "GAMEPLAY") return;
+            
+            const key = e.key.toLowerCase();
+            if (key === 'w' || e.key === 'ArrowUp') keys.w = true;
+            if (key === 'a' || e.key === 'ArrowLeft') keys.a = true;
+            if (key === 's' || e.key === 'ArrowDown') keys.s = true;
+            if (key === 'd' || e.key === 'ArrowRight') keys.d = true;
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                triggerDodgeRoll();
+            }
+            if (key === 'r') {
+                if (isTutorialMode && tutorialStep < 2) {
+                    showFloatingNotification("전술 훈련 3단계 진입 전까지 재장전이 활성화되지 않습니다!");
+                    return;
+                }
+                if (isBulletTime) {
+                    finishRealtimeReload();
+                } else {
+                    if (chamber.length < 6) {
+                        triggerBulletTimeReload(true);
+                    } else {
+                        showFloatingNotification("이미 약실 탄환이 가득 찼습니다!");
+                    }
+                }
+            }
+            if (key === 'e') {
+                triggerInteract();
+            }
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                toggleDungeonMap();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeInteractiveStation();
+                if (isDungeonMapOpen) toggleDungeonMap();
+            }
+        }
+
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+            if (key === 'w' || e.key === 'ArrowUp') keys.w = false;
+            if (key === 'a' || e.key === 'ArrowLeft') keys.a = false;
+            if (key === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (key === 'd' || e.key === 'ArrowRight') keys.d = false;
+        }
+
+        function handleMouseMove(e) {
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = (e.clientX - rect.left) / ZOOM_FACTOR + engineState.camera.x;
+            mousePos.y = (e.clientY - rect.top) / ZOOM_FACTOR + engineState.camera.y;
+        }
+
+        function handleMouseDown(e) {
+            if (currentScreen !== "GAMEPLAY") return;
+            if (isStationActive || isDungeonMapOpen) return;
+            
+            if (e.button === 0) {
+                fireActiveShotgun();
+            }
+        }
+
+        function triggerDodgeRoll() {
+            const p = engineState;
+            const player = p.player;
+            if (player.rollCooldown > 0) return;
+            player.rollDuration = 14;
+            player.rollCooldown = 45;
+            player.isInvulnerable = true;
+
+            let rx = 0; let ry = 0;
+            if (keys.a) rx = -1;
+            if (keys.d) rx = 1;
+            if (keys.w) ry = -1;
+            if (keys.s) ry = 1;
+
+            if (rx === 0 && ry === 0) rx = player.direction;
+            const d = Math.sqrt(rx*rx + ry*ry);
+            player.rollVx = (rx / d) * 7.5;
+            player.rollVy = (ry / d) * 7.5;
+
+            if (isTutorialMode && tutorialStep === 1) {
+                tutorialRollsCount++;
+                if (tutorialRollsCount >= 3) {
+                    synth.play("clear");
+                    tutorialStep = 2;
+                    deck = [];
+                    playerStats.elementCards = createElementStock(3, 3, 0, 0);
+                    chamber = [];
+                    stagedChamber = [];
+                    syncHUDBars();
+                }
+                updateTutorialUI();
+            }
+
+            if (selectedCharacter === "OVERSEER") {
+                player.speedBuffDuration = 90;
+            }
+            
+            synth.play("dodge");
+        }
+
+        function triggerBulletTimeReload(open) {
+            if (open) {
+                isBulletTime = true;
+                synth.play("reload");
+                ensureElementStock();
+                
+                // Keep current chamber but mark pre-loaded bullets so removing them does not refund stock.
+                stagedChamber = chamber.map(bullet => ({ ...bullet, fromExisting: true }));
+                
+                // Show floating hand dock directly over gameplay
+                const dock = document.getElementById("tactical-hand-dock");
+                dock.classList.remove("pointer-events-none", "translate-y-32", "opacity-0");
+                dock.classList.add("translate-y-0", "opacity-100");
+                
+                document.getElementById("game-canvas").classList.add("bullet-time-active-canvas");
+                
+                syncRealtimeReloadUI();
+            } else {
+                isBulletTime = false;
+                
+                const dock = document.getElementById("tactical-hand-dock");
+                dock.classList.add("pointer-events-none", "translate-y-32", "opacity-0");
+                dock.classList.remove("translate-y-0", "opacity-100");
+                
+                document.getElementById("game-canvas").classList.remove("bullet-time-active-canvas");
+            }
+        }
+
+        function syncRealtimeReloadUI() {
+            const stock = ensureElementStock();
+            const previewCont = document.getElementById("realtime-staged-chamber-preview");
+            previewCont.innerHTML = "";
+            
+            stagedChamber.forEach((bullet, idx) => {
+                const bEl = document.createElement("div");
+                bEl.style.backgroundColor = bullet.color;
+                bEl.className = "w-4 h-6 rounded border border-white/30 text-black font-black text-[9px] flex items-center justify-center cursor-pointer transform hover:scale-105 active:scale-95";
+                bEl.innerText = bullet.icon || bullet.element.substring(0, 1);
+                bEl.title = bullet.reloadFresh ? "이번 장전에서 넣은 탄환: 제거하면 원소 재고가 환불됩니다." : "기존 약실 탄환: 제거해도 재고가 돌아오지 않습니다.";
+                bEl.onclick = (e) => {
+                    e.stopPropagation();
+                    const removed = stagedChamber.splice(idx, 1)[0];
+                    if (removed && removed.reloadFresh) {
+                        stock[removed.element] = (stock[removed.element] || 0) + 1;
+                    }
+                    synth.play("reload");
+                    syncRealtimeReloadUI();
+                    syncHUDBars();
+                };
+                previewCont.appendChild(bEl);
+            });
+
+            // Simple consumable element stock hand. Cards do not duplicate forever; each load spends one stock.
+            const handContainer = document.getElementById("reload-deck-hand-container");
+            handContainer.innerHTML = "";
+
+            const totalCards = BASE_CARDS.length;
+            const maxSpreadAngle = 24; 
+            const angleStep = totalCards > 1 ? maxSpreadAngle / (totalCards - 1) : 0;
+            const startAngle = -maxSpreadAngle / 2;
+
+            BASE_CARDS.forEach((card, idx) => {
+                const count = stock[card.element] || 0;
+                const disabled = count <= 0;
+                const cardEl = document.createElement("div");
+                cardEl.className = `fanned-card rounded-xl border p-2.5 flex flex-col justify-between bg-zinc-950 font-mono text-left ${disabled ? "opacity-40 grayscale cursor-not-allowed" : ""}`;
+                cardEl.style.borderColor = `${card.color}70`;
+                
+                let rotateDeg = 0;
+                let translatePx = 0;
+                let horizontalShift = 0;
+
+                if (totalCards > 1) {
+                    rotateDeg = startAngle + (idx * angleStep);
+                    const centerOffset = idx - (totalCards - 1) / 2;
+                    translatePx = Math.pow(centerOffset, 2) * 4;
+                    horizontalShift = centerOffset * 42; 
+                }
+
+                cardEl.style.transform = `translateX(${horizontalShift}px) translateY(${translatePx}px) rotate(${rotateDeg}deg)`;
+                cardEl.style.zIndex = 100 + idx;
+                cardEl.style.setProperty('--hover-x', `${horizontalShift}px`);
+
+                cardEl.innerHTML = `
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-5 h-5 rounded-full shadow-md shadow-black flex items-center justify-center text-xs" style="background-color: ${card.color}22; border: 1px solid ${card.color}80">${card.icon}</span>
+                        <span class="text-[10px] font-black text-white truncate w-16">${card.shortName}</span>
+                    </div>
+                    <p class="text-[7px] text-gray-400 mt-1.5 leading-tight select-none h-12 overflow-hidden">${card.text}</p>
+                    <div class="border-t border-purple-500/15 pt-1 flex justify-between items-center text-[7.5px]">
+                        <span class="font-bold uppercase" style="color: ${card.color}">보유 ${count}</span>
+                        <span class="${disabled ? "text-red-500" : "text-yellow-500"} font-black">${disabled ? "EMPTY" : "LOAD -1"}</span>
+                    </div>
+                `;
+
+                cardEl.onclick = (e) => {
+                    e.stopPropagation();
+                    if (disabled) {
+                        showFloatingNotification(`${card.shortName} 원소 카드가 없습니다. 적 처치 보상이나 필드 파밍으로 확보하십시오!`);
+                        return;
+                    }
+                    if (stagedChamber.length >= 6) {
+                        showFloatingNotification("약실 전술 탄창은 최대 6발까지만 장착될 수 있습니다!");
+                        return;
+                    }
+                    stock[card.element] = Math.max(0, (stock[card.element] || 0) - 1);
+                    stagedChamber.push({ ...card, id: `load_${card.element}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, reloadFresh: true });
+                    synth.play("reload");
+                    syncRealtimeReloadUI();
+                    syncHUDBars();
+                    
+                    engineState.floatingTexts.push({
+                        x: engineState.player.x,
+                        y: engineState.player.y - 20,
+                        text: `${card.shortName} 적재 -1 / 남은 ${stock[card.element]}`,
+                        color: card.color,
+                        vy: -0.8,
+                        life: 40
+                    });
+
+                    if (stagedChamber.length === 6) {
+                        finishRealtimeReload();
+                    }
+                };
+
+                handContainer.appendChild(cardEl);
+            });
+        }
+
+        function clearStagedChamber() {
+            refundFreshStagedBullets(stagedChamber);
+            stagedChamber = [];
+            synth.play("clear");
+            syncRealtimeReloadUI();
+            syncHUDBars();
+        }
+
+        function finishRealtimeReload() {
+            chamber = stagedChamber.map(stripReloadMeta);
+            stagedChamber = [];
+            triggerBulletTimeReload(false);
+            
+            if (isTutorialMode && tutorialStep === 2) {
+                const hasFire = chamber.some(b => b.element === ElementType.FIRE);
+                const hasIce = chamber.some(b => b.element === ElementType.ICE);
+                
+                if (hasFire && hasIce) {
+                    synth.play("clear");
+                    tutorialStep = 3;
+                    
+                    // Spawn a target dummy for elemental attachment testing
+                    engineState.enemies = [{
+                        id: "tut_dummy",
+                        type: "melee",
+                        x: 550,
+                        y: 250,
+                        vx: 0,
+                        vy: 0,
+                        hp: 9999,
+                        maxHp: 9999,
+                        speed: 0,
+                        radius: 20,
+                        color: "#64748b",
+                        shootCooldown: 99999,
+                        hitFlash: 0,
+                        attachedElements: {} // Keyed status elements
+                    }];
+                    tutorialDummySpawned = true;
+                } else {
+                    showFloatingNotification("전술 훈련 준수를 위해 [화염 탄환]과 [냉기 탄환]을 반드시 각 1발 이상 약실에 적재하십시오!");
+                }
+            }
+            
+            syncHUDBars();
+            updateTutorialUI();
+        }
+
+        function fireActiveShotgun() {
+            const s = engineState;
+            const p = s.player;
+            if (p.fireCooldown > 0) return;
+
+            if (chamber.length === 0) {
+                // Instantly go to Bullet-time reload mode on empty
+                triggerBulletTimeReload(true);
+                return;
+            }
+
+            let fireRateMult = 1.0;
+            let damageMult = 1.0;
+            let recoilMult = 1.0;
+            let spreadMult = 1.0;
+
+            equippedParts.forEach(part => {
+                if (part.multiplier.fireRate) fireRateMult *= part.multiplier.fireRate;
+                if (part.multiplier.damage) damageMult *= part.multiplier.damage;
+                if (part.multiplier.recoil) recoilMult *= part.multiplier.recoil;
+                if (part.multiplier.spread) spreadMult *= part.multiplier.spread;
+            });
+
+            const activeBullet = chamber[0];
+            chamber = chamber.slice(1);
+
+            synth.play("shoot");
+
+            const angleToMouse = Math.atan2(mousePos.y - p.y, mousePos.x - p.x);
+            const pellets = 5;
+            const spreadAngle = 0.28 * spreadMult;
+
+            for (let i = 0; i < pellets; i++) {
+                const offset = (i - (pellets-1)/2) * (spreadAngle / (pellets-1));
+                const finalAng = angleToMouse + offset;
+                s.projectiles.push({
+                    type: "player_bullet",
+                    element: activeBullet.element,
+                    x: p.x + Math.cos(angleToMouse) * 15,
+                    y: p.y + Math.sin(angleToMouse) * 15,
+                    vx: Math.cos(finalAng) * 9.5,
+                    vy: Math.sin(finalAng) * 9.5,
+                    radius: 3.5,
+                    damage: 12 * damageMult,
+                    color: activeBullet.color,
+                    life: 45
+                });
+            }
+
+            const recDist = 4.0 * recoilMult;
+            p.vx -= Math.cos(angleToMouse) * recDist;
+            p.vy -= Math.sin(angleToMouse) * recDist;
+
+            s.recoilOffset = 14;
+            s.screenShake = Math.max(s.screenShake, 11);
+
+            if (selectedCharacter === "SENTINEL") {
+                p.vx *= 0.5; p.vy *= 0.5;
+            }
+
+            p.fireCooldown = Math.round(25 * fireRateMult);
+
+            s.muzzleFlashTimer = 6;
+            s.muzzleFlashAngle = angleToMouse;
+
+            for (let j = 0; j < 10; j++) {
+                s.particles.push({
+                    x: p.x + Math.cos(angleToMouse)*15,
+                    y: p.y + Math.sin(angleToMouse)*15,
+                    vx: (Math.cos(angleToMouse) + (Math.random()-0.5)*0.5) * (3 + Math.random()*4),
+                    vy: (Math.sin(angleToMouse) + (Math.random()-0.5)*0.5) * (3 + Math.random()*4),
+                    radius: 2.5 + Math.random()*3,
+                    color: activeBullet.color,
+                    life: 15 + Math.random()*15
+                });
+            }
+
+            // Drop a satisfying shell casing particle
+            const casingAng = angleToMouse + Math.PI*0.5 + (Math.random()-0.5)*0.3;
+            s.particles.push({
+                x: p.x,
+                y: p.y,
+                vx: Math.cos(casingAng) * (2 + Math.random()*2),
+                vy: Math.sin(casingAng) * (2 + Math.random()*2) - 1.5,
+                radius: 1.5,
+                color: "#eab308",
+                isCasing: true,
+                bounceCount: 0,
+                life: 60
+            });
+
+            syncHUDBars();
+        }
+
+        function applyElementalBulletHit(enemy, bulletElement, p) {
+            const s = engineState;
+            if (!enemy.attachedElements) {
+                enemy.attachedElements = {};
+            }
+
+            const hadFire = enemy.attachedElements[ElementType.FIRE] > 0;
+            const hadIce = enemy.attachedElements[ElementType.ICE] > 0;
+            const hadLightning = enemy.attachedElements[ElementType.LIGHTNING] > 0;
+            const hadVoid = enemy.attachedElements[ElementType.VOID] > 0;
+
+            function completeTutorialIfNeeded() {
+                if (isTutorialMode && tutorialStep === 3) {
+                    synth.play("clear");
+                    tutorialStep = 4;
+                    s.enemies = [];
+                    s.gateways.push({
+                        id: "tut_portal",
+                        x: 780,
+                        y: 250,
+                        radius: 25,
+                        targetNode: routeNodes[1],
+                        name: "차원 수송 게이트 (훈련 수료)",
+                        color: "#10b981"
+                    });
+                    updateTutorialUI();
+                }
+            }
+
+            // 3개 조합만 유지: 화염+냉기, 화염+뇌전, 냉기+공허
+            if ((bulletElement === ElementType.FIRE && hadIce) || (bulletElement === ElementType.ICE && hadFire)) {
+                triggerElementReaction(enemy, "열충격! 화염+냉기 폭발", "#ef4444");
+                enemy.hp -= 60;
+                delete enemy.attachedElements[ElementType.FIRE];
+                delete enemy.attachedElements[ElementType.ICE];
+                completeTutorialIfNeeded();
+                return;
+            }
+
+            if ((bulletElement === ElementType.FIRE && hadLightning) || (bulletElement === ElementType.LIGHTNING && hadFire)) {
+                triggerElementReaction(enemy, "플라즈마! 화염+뇌전 연쇄", "#fb923c");
+                enemy.hp -= 45;
+                delete enemy.attachedElements[ElementType.FIRE];
+                delete enemy.attachedElements[ElementType.LIGHTNING];
+                let chainCount = 0;
+                s.enemies.forEach(other => {
+                    if (other !== enemy && chainCount < 2) {
+                        const d = Math.sqrt((other.x - enemy.x)**2 + (other.y - enemy.y)**2);
+                        if (d < 155) {
+                            other.hp -= 22;
+                            other.hitFlash = 10;
+                            s.floatingTexts.push({ x: other.x, y: other.y - 12, text: "플라즈마 전이 -22", color: "#fb923c", vy: -0.8, life: 30 });
+                            chainCount++;
+                        }
+                    }
+                });
+                return;
+            }
+
+            if ((bulletElement === ElementType.ICE && hadVoid) || (bulletElement === ElementType.VOID && hadIce)) {
+                triggerElementReaction(enemy, "심연동결! 냉기+공허", "#a855f7");
+                enemy.hp -= 25;
+                enemy.freezeDuration = 210;
+                delete enemy.attachedElements[ElementType.ICE];
+                delete enemy.attachedElements[ElementType.VOID];
+                return;
+            }
+
+            enemy.attachedElements[bulletElement] = 300;
+            const card = getCardTemplateByElement(bulletElement);
+            s.floatingTexts.push({ x: enemy.x, y: enemy.y - 15, text: `${card.shortName} 부착`, color: card.color, vy: -0.6, life: 30 });
+        }
+
+        function triggerElementReaction(enemy, text, color) {
+            const s = engineState;
+            synth.play("reaction");
+            s.screenShake = 18;
+            s.floatingTexts.push({
+                x: enemy.x,
+                y: enemy.y - 35,
+                text: text,
+                color: color,
+                vy: -1.4,
+                life: 55,
+                isHeader: true
+            });
+
+            // Create massive reaction shock particles
+            for (let j = 0; j < 18; j++) {
+                s.particles.push({
+                    x: enemy.x,
+                    y: enemy.y,
+                    vx: (Math.random() - 0.5) * 11,
+                    vy: (Math.random() - 0.5) * 11,
+                    radius: 3 + Math.random() * 5,
+                    color: color,
+                    life: 25 + Math.random() * 20
+                });
+            }
+        }
+
+        function triggerInteract() {
+            const s = engineState;
+            const p = s.player;
+
+            s.stations.forEach(station => {
+                const dist = Math.sqrt((station.x - p.x)**2 + (station.y - p.y)**2);
+                if (dist < 45) {
+                    openInteractiveStation(station);
+                }
+            });
+
+            for (let i = s.groundItems.length - 1; i >= 0; i--) {
+                const item = s.groundItems[i];
+                const d = Math.sqrt((item.x - p.x)**2 + (item.y - p.y)**2);
+                if (d < 35) {
+                    synth.play("clear");
+                    
+                    if (item.type === "CRYSTAL") {
+                        metaProgress.crystal += item.amount;
+                        saveMetaProgress();
+                        syncMetaShopUI();
+                        s.floatingTexts.push({ x: item.x, y: item.y - 10, text: `결정체 +${item.amount}`, color: "#22d3ee", vy: -1.2, life: 35 });
+                    } else if (item.type === "SCRAP_METAL") {
+                        playerStats.scraps.metal += item.amount;
+                        s.floatingTexts.push({ x: item.x, y: item.y - 10, text: `금속 스크랩 +${item.amount}`, color: "#a855f7", vy: -1.2, life: 35 });
+                    } else if (item.type === "GOLD") {
+                        playerStats.gold += item.amount;
+                        s.floatingTexts.push({ x: item.x, y: item.y - 10, text: `골드 +${item.amount}G`, color: "#fbbf24", vy: -1.2, life: 35 });
+                    } else if (item.type === "ELEMENT_CARD") {
+                        addElementStock(item.element, item.amount, false);
+                        const card = getCardTemplateByElement(item.element);
+                        s.floatingTexts.push({ x: item.x, y: item.y - 10, text: `${card.shortName} 원소 카드 +${item.amount}`, color: card.color, vy: -1.2, life: 35 });
+                    }
+
+                    s.groundItems.splice(i, 1);
+                    syncHUDBars();
+                }
+            }
+        }
+
+        function openInteractiveStation(station) {
+            isStationActive = true;
+            activeStationType = station.type;
+            
+            const titleEl = document.getElementById("station-title-text");
+            titleEl.innerText = station.name;
+
+            document.getElementById("station-content-shop").classList.add("hidden");
+            document.getElementById("station-content-forge").classList.add("hidden");
+            document.getElementById("station-content-altar").classList.add("hidden");
+
+            document.getElementById("system-station-overlay").classList.remove("hidden");
+
+            if (station.type === "SHOP") {
+                document.getElementById("station-content-shop").classList.remove("hidden");
+                buildShopContent();
+            } else if (station.type === "FORGE") {
+                document.getElementById("station-content-forge").classList.remove("hidden");
+                buildForgeContent();
+            } else if (station.type === "ALTAR") {
+                document.getElementById("station-content-altar").classList.remove("hidden");
+                document.getElementById("altar-prompt-text").innerText = `정적을 깨는 수수께끼 심연 결정체가 가동 중입니다. 에너지를 자극하여 무작위 화물 자원들을 전송받으시겠습니까?`;
+            }
+        }
+
+        function closeInteractiveStation() {
+            isStationActive = false;
+            document.getElementById("system-station-overlay").classList.add("hidden");
+
+            const s = engineState;
+            if (activeRoom && (activeRoom.type === "SHOP" || activeRoom.type === "FORGE" || activeRoom.type === "ALTAR") && s.gateways.length === 0) {
+                synth.play("clear");
+                const nextChoices = findAvailableNextChoices();
+                if (nextChoices.length === 0) {
+                    s.gateways.push({
+                        id: "victory_end",
+                        x: 820,
+                        y: 300,
+                        radius: 30,
+                        color: "#10b981",
+                        name: "심연의 틈 탈출구 (VICTORY CLEAR)",
+                        targetNode: null
+                    });
+                } else {
+                    nextChoices.forEach((node, idx) => {
+                        s.gateways.push({
+                            id: `gate_${node.id}`,
+                            x: 800,
+                            y: 200 + idx * 200,
+                            radius: 25,
+                            color: "#a855f7",
+                            name: node.label,
+                            targetNode: node
+                        });
+                    });
+                }
+                showFloatingNotification("관문 포탈이 활성화되었습니다! 이동할 구역을 선택하십시오.");
+            }
+        }
+
+        function buildShopContent() {
+            document.getElementById("shop-customer-gold").innerText = `소지 골드: ${playerStats.gold}G`;
+            const sCont = document.getElementById("shop-items-container");
+            sCont.innerHTML = "";
+
+            const discount = (metaProgress.unlocked_upgrades.shop_discount || 0) * 0.15;
+
+            BASE_CARDS.forEach(card => {
+                const finalCost = Math.round(card.cost * (1 - discount));
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5";
+                itemDiv.innerHTML = `
+                    <div class="text-left">
+                        <span class="text-xs font-bold text-white">${card.icon} ${card.shortName} 원소 카드 묶음 (+5)</span>
+                        <span class="text-[9px] text-gray-400 block">장전 때 1발마다 1개씩 소비됩니다. ${card.text}</span>
+                    </div>
+                    <button onclick="buyShopItem('CARD', '${card.id}', ${finalCost})" class="px-2.5 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-black font-black text-[10px] rounded tracking-wider transition-all cursor-pointer">
+                        ${finalCost}G 구매
+                    </button>
+                `;
+                sCont.appendChild(itemDiv);
+            });
+
+            BASE_PARTS.forEach(part => {
+                const finalCost = Math.round(part.cost * (1 - discount));
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5";
+                itemDiv.innerHTML = `
+                    <div class="text-left">
+                        <span class="text-xs font-bold text-cyan-300">${part.name}</span>
+                        <span class="text-[9px] text-gray-400 block">${part.description}</span>
+                    </div>
+                    <button onclick="buyShopItem('PART', '${part.id}', ${finalCost})" class="px-2.5 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-black font-black text-[10px] rounded tracking-wider transition-all cursor-pointer">
+                        ${finalCost}G 구매
+                    </button>
+                `;
+                sCont.appendChild(itemDiv);
+            });
+        }
+
+        function buyShopItem(type, itemId, cost) {
+            synth.init();
+            if (playerStats.gold >= cost) {
+                playerStats.gold -= cost;
+                synth.play("clear");
+
+                if (type === 'CARD') {
+                    const cardTemplate = BASE_CARDS.find(c => c.id === itemId);
+                    addElementStock(cardTemplate.element, 5, false);
+                    showFloatingNotification(`${cardTemplate.shortName} 원소 카드 묶음 +5 확보! 장전 시 소모됩니다.`);
+                } else {
+                    const partTemplate = BASE_PARTS.find(p => p.id === itemId);
+                    ownedParts.push({ ...partTemplate, id: `buy_p_${Math.random().toString(36).substr(2, 5)}` });
+                    showFloatingNotification(`${partTemplate.name} 기기 부품을 획득 창고로 영입했습니다!`);
+                }
+
+                buildShopContent();
+                syncHUDBars();
+            } else {
+                synth.play("hit_player");
+                showFloatingNotification("던전 보유 골드가 부족해 아이템을 인수할 수 없습니다!");
+            }
+        }
+
+        function buildForgeContent() {
+            const eqList = document.getElementById("forge-equipped-list");
+            eqList.innerHTML = "";
+
+            equippedParts.forEach((part, idx) => {
+                const pEl = document.createElement("div");
+                pEl.className = "p-2 bg-cyan-950/40 border border-cyan-500/20 rounded-lg flex items-center justify-between text-xs";
+                pEl.innerHTML = `
+                    <span class="font-bold text-white text-[10px]">${part.name}</span>
+                    <button onclick="unequipPart(${idx})" class="px-2 py-0.5 bg-red-950/80 text-red-300 text-[8px] rounded border border-red-800/40 cursor-pointer hover:bg-red-900">
+                        분리
+                    </button>
+                `;
+                eqList.appendChild(pEl);
+            });
+            if (equippedParts.length === 0) {
+                eqList.innerHTML = `<span class="text-[9px] text-gray-500 italic block py-2 text-center">장착 중인 정밀 슬롯 모듈이 없습니다.</span>`;
+            }
+
+            const invList = document.getElementById("forge-inventory-list");
+            invList.innerHTML = "";
+
+            ownedParts.forEach((part, idx) => {
+                const pEl = document.createElement("div");
+                pEl.className = "p-2 bg-white/5 border border-white/5 rounded-lg flex items-center justify-between text-xs hover:border-white/10";
+                pEl.innerHTML = `
+                    <div class="flex flex-col text-left">
+                        <span class="font-bold text-gray-300 text-[10px]">${part.name}</span>
+                        <span class="text-[8px] text-gray-400 truncate w-44">${part.description}</span>
+                    </div>
+                    <button onclick="equipPart(${idx})" class="px-2 py-0.5 bg-cyan-950 text-cyan-300 text-[8px] rounded border border-cyan-800/40 cursor-pointer hover:bg-cyan-900">
+                        조립 장착
+                    </button>
+                `;
+                invList.appendChild(pEl);
+            });
+            if (ownedParts.length === 0) {
+                invList.innerHTML = `<span class="text-[9px] text-gray-500 italic block py-2 text-center">보유 여분 저장공간이 비어있습니다.</span>`;
+            }
+        }
+
+        function equipPart(invIndex) {
+            if (equippedParts.length >= 3) {
+                showFloatingNotification("샷건 모듈 하드웨어 슬롯이 가득 찼습니다! (최대 3개)");
+                return;
+            }
+            const part = ownedParts[invIndex];
+            ownedParts.splice(invIndex, 1);
+            equippedParts.push(part);
+            
+            synth.play("clear");
+            buildForgeContent();
+            syncHUDBars();
+        }
+
+        function unequipPart(eqIndex) {
+            const part = equippedParts[eqIndex];
+            equippedParts.splice(eqIndex, 1);
+            ownedParts.push(part);
+
+            synth.play("reload");
+            buildForgeContent();
+            syncHUDBars();
+        }
+
+        function craftPart(recipeType) {
+            synth.init();
+            if (recipeType === 'CHOKE') {
+                if (playerStats.scraps.metal >= 5) {
+                    playerStats.scraps.metal -= 5;
+                    ownedParts.push({ ...BASE_PARTS[0], id: `craft_p_${Math.random()}` });
+                    synth.play("clear");
+                    buildForgeContent();
+                    syncHUDBars();
+                } else {
+                    showFloatingNotification("금속 스크랩이 부족해 초크를 조립할 수 없습니다! (필요: 금속 5)");
+                }
+            } else if (recipeType === 'AUTO_TRIGGER') {
+                if (playerStats.scraps.crystal >= 10) {
+                    playerStats.scraps.crystal -= 10;
+                    ownedParts.push({ ...BASE_PARTS[1], id: `craft_p_${Math.random()}` });
+                    synth.play("clear");
+                    buildForgeContent();
+                    syncHUDBars();
+                } else {
+                    showFloatingNotification("결정체 파편이 부족해 방아쇠를 벼릴 수 없습니다! (필요: 결정체 10)");
+                }
+            }
+        }
+
+        function acceptAltarReward(choice) {
+            if (choice) {
+                synth.play("clear");
+                const goldRnd = 15 + Math.floor(Math.random() * 25);
+                const cryRnd = 4 + Math.floor(Math.random() * 6);
+                const elementReward = randomElementCard();
+                const elementAmount = 3 + Math.floor(Math.random() * 4);
+                
+                playerStats.gold += goldRnd;
+                addElementStock(elementReward.element, elementAmount, false);
+                metaProgress.crystal += cryRnd;
+                saveMetaProgress();
+                syncMetaShopUI();
+
+                const sCont = engineState;
+                sCont.floatingTexts.push({
+                    x: sCont.player.x, y: sCont.player.y - 15,
+                    text: `유물 공명 축복! +${goldRnd}G, 결정체 +${cryRnd}, ${elementReward.shortName} +${elementAmount}`,
+                    color: "#22d3ee", vy: -1.0, life: 60
+                });
+
+                closeInteractiveStation();
+                engineState.stations = [];
+                syncHUDBars();
+            }
+        }
+
+        function syncHUDBars() {
+            ensureElementStock();
+            document.getElementById("hud-hp-text").innerText = `${Math.round(playerStats.hp)}/${playerStats.maxHp}`;
+            const hpPct = Math.max(0, Math.min(100, (playerStats.hp / playerStats.maxHp) * 100));
+            document.getElementById("hud-hp-bar").style.width = `${hpPct}%`;
+
+            const chamberIconsCont = document.getElementById("hud-chamber-icons");
+            chamberIconsCont.innerHTML = "";
+
+            for (let i = 0; i < 6; i++) {
+                const div = document.createElement("div");
+                if (i < chamber.length) {
+                    const b = chamber[i];
+                    div.style.backgroundColor = b.color;
+                    div.className = "w-4.5 h-7 rounded border border-white/40 flex items-center justify-center font-bold font-mono text-[9px] text-black shadow-lg shadow-black/60 relative group";
+                    div.innerHTML = `
+                        <span>${b.icon || b.element.substring(0, 1)}</span>
+                        <div class="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/95 text-white text-[8px] p-1.5 rounded hidden group-hover:block z-50 whitespace-nowrap border border-white/10 leading-none">
+                            ${b.name}
+                        </div>
+                    `;
+                } else {
+                    div.className = "w-4.5 h-7 rounded border border-dashed border-gray-800 bg-gray-950/20";
+                }
+                chamberIconsCont.appendChild(div);
+            }
+
+            document.getElementById("hud-chamber-text").innerText = `${chamber.length}/6`;
+            
+            const barPct = (chamber.length / 6) * 100;
+            document.getElementById("hud-reload-bar").style.width = `${barPct}%`;
+
+            const stock = playerStats.elementCards;
+            document.getElementById("hud-floor-text").innerText = isCorridor ? "차원 교차로 횡단" : activeRoom ? activeRoom.label : "심연 1층";
+            document.getElementById("hud-gold-text").innerText = `${playerStats.gold}G`;
+            document.getElementById("hud-scraps-text").innerText = `🔥${stock.FIRE} ❄${stock.ICE} ⚡${stock.LIGHTNING} 🌀${stock.VOID}`;
+        }
+
+        function resizeCanvas() {
+            if (!canvas) return;
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        function checkAndTriggerCombatSpawns() {
+            const s = engineState;
+            const p = s.player;
+            if (activeRoom && (activeRoom.type === "COMBAT" || activeRoom.type === "BOSS") && !isCorridor && !isTutorialMode) {
+                if (!s.combatStart) {
+                    const distToCenter = Math.sqrt((p.x - 500)**2 + (p.y - 300)**2);
+                    if (distToCenter < 120) {
+                        s.combatStart = true;
+                        synth.play("hit_player");
+                        s.screenShake = 22;
+                        s.floatingTexts.push({ x: 500, y: 150, text: "경보! 격리 장벽 파수 기기 가동!!", color: "#f43f5e", vy: -0.5, life: 90, isHeader: true });
+                        
+                        const isBoss = activeRoom.type === "BOSS";
+                        const spawnCount = isBoss ? 1 : (difficultyLevel === "HARD" ? 6 : 4);
+                        s.totalEnemiesSpawned = spawnCount;
+                        
+                        if (isBoss) {
+                            s.enemies.push({
+                                id: "boss_guardian",
+                                type: "boss",
+                                x: 750,
+                                y: 300,
+                                vx: 0, vy: 0,
+                                hp: 450, maxHp: 450,
+                                speed: 1.1,
+                                radius: 38,
+                                color: "#f43f5e",
+                                shootCooldown: 60,
+                                hitFlash: 0,
+                                attachedElements: {}
+                            });
+                        } else {
+                            for (let i = 0; i < spawnCount; i++) {
+                                s.enemies.push({
+                                    id: `enemy_${i}`,
+                                    type: Math.random() < 0.45 ? "range" : "melee",
+                                    x: 550 + Math.random() * 250,
+                                    y: 100 + Math.random() * 400,
+                                    vx: 0, vy: 0,
+                                    hp: 45, maxHp: 45,
+                                    speed: 1.4 + Math.random() * 0.8,
+                                    radius: 14 + Math.random() * 4,
+                                    color: "#b91c1c",
+                                    shootCooldown: 90 + Math.floor(Math.random() * 50),
+                                    hitFlash: 0,
+                                    attachedElements: {}
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function updatePhysics() {
+            const s = engineState;
+            const p = s.player;
+
+            // Fluid speed dilatation constant for slow motion
+            const dt = isBulletTime ? 0.15 : 1.0;
+
+            if (s.screenShake > 0) s.screenShake *= 0.88;
+            if (s.recoilOffset > 0) s.recoilOffset -= 1.5;
+            if (s.muzzleFlashTimer > 0) s.muzzleFlashTimer--;
+
+            s.enemies.forEach(enemy => {
+                if (enemy.hitFlash > 0) enemy.hitFlash--;
+                if (enemy.freezeDuration > 0) enemy.freezeDuration -= dt;
+                
+                // Decay attached elements over active frame steps
+                if (enemy.attachedElements) {
+                    for (let el in enemy.attachedElements) {
+                        if (enemy.attachedElements[el] > 0) {
+                            enemy.attachedElements[el] -= dt;
+                        } else {
+                            delete enemy.attachedElements[el];
+                        }
+                    }
+                }
+            });
+
+            if (p.rollDuration > 0) {
+                p.x += p.rollVx * dt;
+                p.y += p.rollVy * dt;
+                p.rollDuration--;
+            } else {
+                let dx = 0; let dy = 0;
+                if (keys.w) dy -= 1;
+                if (keys.s) dy += 1;
+                if (keys.a) dx -= 1;
+                if (keys.d) dx += 1;
+
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.7071; dy *= 0.7071;
+                }
+
+                let speed = 3.3;
+                if (selectedCharacter === "OVERSEER" && p.speedBuffDuration > 0) {
+                    speed *= 1.45;
+                    p.speedBuffDuration--;
+                }
+
+                p.vx += dx * speed * 0.2;
+                p.vy += dy * speed * 0.2;
+                p.vx *= 0.75;
+                p.vy *= 0.75;
+
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+            }
+
+            p.x = Math.max(p.radius, Math.min(s.roomBounds.w - p.radius, p.x));
+            p.y = Math.max(p.radius, Math.min(s.roomBounds.h - p.radius, p.y));
+
+            if (isTutorialMode && tutorialStep === 0) {
+                const distToMarker = Math.sqrt((p.x - tutorialMarker.x)**2 + (p.y - tutorialMarker.y)**2);
+                if (distToMarker < p.radius + tutorialMarker.radius) {
+                    synth.play("clear");
+                    tutorialStep = 1;
+                    updateTutorialUI();
+                }
+            }
+
+            if (p.rollCooldown > 0) p.rollCooldown--;
+            if (p.rollDuration === 0) p.isInvulnerable = false;
+            if (p.fireCooldown > 0) p.fireCooldown--;
+
+            // Projectile steps scaled by slow-mo time delta
+            for (let i = s.projectiles.length - 1; i >= 0; i--) {
+                const proj = s.projectiles[i];
+                proj.x += proj.vx * dt;
+                proj.y += proj.vy * dt;
+                proj.life -= dt;
+
+                if (proj.x < 0 || proj.x > s.roomBounds.w || proj.y < 0 || proj.y > s.roomBounds.h || proj.life <= 0) {
+                    s.projectiles.splice(i, 1);
+                    continue;
+                }
+
+                let blockCollided = false;
+                for (let o of s.obstacles) {
+                    const d = Math.sqrt((proj.x - o.x)**2 + (proj.y - o.y)**2);
+                    if (d < o.radius) {
+                        blockCollided = true;
+                        break;
+                    }
+                }
+                if (blockCollided) {
+                    s.projectiles.splice(i, 1);
+                    continue;
+                }
+
+                if (proj.type === "player_bullet") {
+                    let hitSomething = false;
+                    for (let enemy of s.enemies) {
+                        const d = Math.sqrt((proj.x - enemy.x)**2 + (proj.y - enemy.y)**2);
+                        if (d < enemy.radius) {
+                            enemy.hp -= proj.damage;
+                            enemy.hitFlash = 10;
+                            
+                            // Trigger dynamic attachment and reaction logic
+                            applyElementalBulletHit(enemy, proj.element, p);
+                            
+                            s.floatingTexts.push({ x: enemy.x, y: enemy.y - 12, text: `-${Math.round(proj.damage)}`, color: proj.color, vy: -1.0, life: 25 });
+                            synth.play("hit_enemy");
+                            
+                            s.screenShake = Math.max(s.screenShake, 3);
+
+                            for (let k = 0; k < 5; k++) {
+                                s.particles.push({
+                                    x: enemy.x,
+                                    y: enemy.y,
+                                    vx: (Math.random() - 0.5) * 5,
+                                    vy: (Math.random() - 0.5) * 5,
+                                    radius: 1.5 + Math.random() * 2,
+                                    color: enemy.color,
+                                    life: 15 + Math.random() * 10
+                                });
+                            }
+
+                            hitSomething = true;
+                            break;
+                        }
+                    }
+                    if (hitSomething) {
+                        s.projectiles.splice(i, 1);
+                    }
+                } else if (proj.type === "enemy_bullet") {
+                    const d = Math.sqrt((proj.x - p.x)**2 + (proj.y - p.y)**2);
+                    if (d < p.radius) {
+                        if (!p.isInvulnerable) {
+                            playerStats.hp -= proj.damage;
+                            synth.play("hit_player");
+                            
+                            s.screenShake = 18;
+                            s.hitOverlayTimer = 14;
+
+                            s.floatingTexts.push({ x: p.x, y: p.y - 12, text: `-${Math.round(proj.damage)}`, color: "#ef4444", vy: -1.0, life: 30, isHeader: true });
+                            
+                            for (let k = 0; k < 12; k++) {
+                                s.particles.push({
+                                    x: p.x,
+                                    y: p.y,
+                                    vx: (Math.random() - 0.5) * 6,
+                                    vy: (Math.random() - 0.5) * 6,
+                                    radius: 2 + Math.random() * 3,
+                                    color: "#ef4444",
+                                    life: 20 + Math.random() * 15
+                                });
+                            }
+
+                            if (playerStats.hp <= 0) {
+                                triggerPlayerDefeat();
+                            }
+                            syncHUDBars();
+                        }
+                        s.projectiles.splice(i, 1);
+                    }
+                }
+            }
+
+            checkAndTriggerCombatSpawns();
+
+            for (let i = s.enemies.length - 1; i >= 0; i--) {
+                const enemy = s.enemies[i];
+                const angToP = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+                
+                if (enemy.id !== "tut_dummy" && (!enemy.freezeDuration || enemy.freezeDuration <= 0)) {
+                    enemy.vx += Math.cos(angToP) * enemy.speed * 0.12;
+                    enemy.vy += Math.sin(angToP) * enemy.speed * 0.12;
+                }
+                
+                enemy.vx *= 0.82;
+                enemy.vy *= 0.82;
+
+                enemy.x += enemy.vx * dt;
+                enemy.y += enemy.vy * dt;
+
+                s.obstacles.forEach(o => {
+                    const dist = Math.sqrt((enemy.x - o.x)**2 + (enemy.y - o.y)**2);
+                    if (dist < enemy.radius + o.radius) {
+                        const pushAng = Math.atan2(enemy.y - o.y, enemy.x - o.x);
+                        enemy.x = o.x + Math.cos(pushAng) * (enemy.radius + o.radius);
+                        enemy.y = o.y + Math.sin(pushAng) * (enemy.radius + o.radius);
+                    }
+                });
+
+                if ((enemy.type === "range" || enemy.type === "boss") && (!enemy.freezeDuration || enemy.freezeDuration <= 0)) {
+                    enemy.shootCooldown -= dt;
+                    if (enemy.shootCooldown <= 0) {
+                        synth.play("shoot");
+                        s.projectiles.push({
+                            type: "enemy_bullet",
+                            x: enemy.x + Math.cos(angToP) * enemy.radius,
+                            y: enemy.y + Math.sin(angToP) * enemy.radius,
+                            vx: Math.cos(angToP) * 5.5,
+                            vy: Math.sin(angToP) * 5.5,
+                            radius: 4,
+                            damage: enemy.type === "boss" ? 18 : 10,
+                            color: "#ef4444",
+                            life: 110
+                        });
+                        enemy.shootCooldown = enemy.type === "boss" ? 35 : 120;
+                    }
+                }
+
+                const distToPlayer = Math.sqrt((enemy.x - p.x)**2 + (enemy.y - p.y)**2);
+                if (distToPlayer < enemy.radius + p.radius && !p.isInvulnerable && enemy.id !== "tut_dummy") {
+                    playerStats.hp -= 0.6 * dt;
+                    s.screenShake = Math.max(s.screenShake, 3);
+                    if (Math.random() < 0.1) {
+                        synth.play("hit_player");
+                        s.hitOverlayTimer = 8;
+                        s.floatingTexts.push({ x: p.x, y: p.y - 12, text: "-5", color: "#f87171", vy: -1.0, life: 20 });
+                    }
+                    if (playerStats.hp <= 0) {
+                        triggerPlayerDefeat();
+                    }
+                    syncHUDBars();
+                }
+
+                if (enemy.hp <= 0) {
+                    synth.play("clear");
+                    
+                    const scAmount = Math.floor(Math.random() * 3) + 1;
+                    s.groundItems.push({
+                        type: "GOLD",
+                        x: enemy.x,
+                        y: enemy.y,
+                        amount: Math.floor(Math.random() * 8) + 6,
+                        radius: 8,
+                        color: "#fbbf24"
+                    });
+                    
+                    if (Math.random() < 0.45) {
+                        s.groundItems.push({
+                            type: "SCRAP_METAL",
+                            x: enemy.x + 10,
+                            y: enemy.y,
+                            amount: scAmount,
+                            radius: 8,
+                            color: "#a855f7"
+                        });
+                    }
+
+                    if (Math.random() < 0.70) {
+                        const eCard = randomElementCard();
+                        s.groundItems.push({
+                            type: "ELEMENT_CARD",
+                            element: eCard.element,
+                            x: enemy.x - 12,
+                            y: enemy.y + 8,
+                            amount: 1 + Math.floor(Math.random() * (enemy.type === "boss" ? 4 : 3)),
+                            radius: 8,
+                            color: eCard.color
+                        });
+                    }
+
+                    for (let k = 0; k < 12; k++) {
+                        s.particles.push({
+                            x: enemy.x,
+                            y: enemy.y,
+                            vx: (Math.random() - 0.5) * 6,
+                            vy: (Math.random() - 0.5) * 6,
+                            radius: 2 + Math.random() * 4,
+                            color: enemy.color,
+                            life: 20 + Math.random() * 20
+                        });
+                    }
+
+                    s.enemies.splice(i, 1);
+                    s.enemiesKilledInThisRoom++;
+                    playerStats.kills++;
+                }
+            }
+
+            // Spawning gateways immediately upon clearing the combat zone
+            if (s.combatStart && s.enemies.length === 0 && !s.combatClearedTriggered) {
+                s.combatClearedTriggered = true;
+                synth.play("clear");
+                showFloatingNotification("구역 수호 파수기 처치 완료! 관문 포탈이 생성되었습니다.");
+                
+                s.groundItems.push({
+                    type: "CRYSTAL",
+                    x: 500,
+                    y: 300,
+                    amount: activeRoom.type === "BOSS" ? 12 : 5,
+                    radius: 10,
+                    color: "#22d3ee"
+                });
+
+                const randomCardTemplate = randomElementCard();
+                s.groundItems.push({
+                    type: "ELEMENT_CARD",
+                    element: randomCardTemplate.element,
+                    x: 460,
+                    y: 300,
+                    amount: activeRoom.type === "BOSS" ? 8 : 4,
+                    radius: 9,
+                    color: randomCardTemplate.color
+                });
+
+                const nextChoices = findAvailableNextChoices();
+                if (nextChoices.length === 0) {
+                    s.gateways.push({
+                        id: "victory_end",
+                        x: 820,
+                        y: 300,
+                        radius: 30,
+                        color: "#10b981",
+                        name: "심연의 틈 탈출구 (VICTORY CLEAR)",
+                        targetNode: null
+                    });
+                } else {
+                    nextChoices.forEach((node, idx) => {
+                        s.gateways.push({
+                            id: `gate_${node.id}`,
+                            x: 800,
+                            y: 200 + idx * 200,
+                            radius: 25,
+                            color: "#a855f7",
+                            name: node.label,
+                            targetNode: node
+                        });
+                    });
+                }
+            }
+
+            s.particles.forEach((part, idx) => {
+                if (part.isCasing) {
+                    part.vy += 0.15 * dt;
+                    part.x += part.vx * dt;
+                    part.y += part.vy * dt;
+
+                    if (part.y >= s.roomBounds.h - part.radius) {
+                        part.y = s.roomBounds.h - part.radius;
+                        part.vy = -part.vy * 0.45;
+                        part.vx *= 0.6;
+                        part.bounceCount++;
+                        if (part.bounceCount <= 2) {
+                            synth.play("casing");
+                        }
+                    }
+                } else {
+                    part.x += part.vx * dt;
+                    part.y += part.vy * dt;
+                }
+                
+                part.life -= dt;
+                if (part.life <= 0) s.particles.splice(idx, 1);
+            });
+
+            s.floatingTexts.forEach((ft, idx) => {
+                ft.y += ft.vy * dt;
+                ft.life -= dt;
+                if (ft.life <= 0) s.floatingTexts.splice(idx, 1);
+            });
+
+            let onGateway = false;
+            let currentTooltip = "";
+            s.gateways.forEach(gate => {
+                const d = Math.sqrt((gate.x - p.x)**2 + (gate.y - p.y)**2);
+                if (d < 30) {
+                    onGateway = true;
+                    
+                    if (isTutorialMode && gate.id === "tut_portal") {
+                        synth.play("clear");
+                        isTutorialMode = false;
+                        document.getElementById("tutorial-guide-panel").classList.add("hidden");
+                        showFloatingNotification("전술 훈련 완수! 차원 좌표를 탐사 본대로 전송합니다.");
+                        
+                        isCorridor = true;
+                        corridorTarget = routeNodes[1];
+                        setupRoomState();
+                        return;
+                    }
+
+                    if (isCorridor) {
+                        isCorridor = false;
+                        activeRoom = gate.targetNode;
+                        setupRoomState();
+                    } else {
+                        isCorridor = true;
+                        corridorTarget = gate.targetNode;
+                        setupRoomState();
+                    }
+                } else if (d < 60) {
+                    currentTooltip = `[관문 진입] ${gate.name}`;
+                }
+            });
+
+            let nearPickup = false;
+            s.groundItems.forEach(item => {
+                const d = Math.sqrt((item.x - p.x)**2 + (item.y - p.y)**2);
+                if (d < 50) {
+                    nearPickup = true;
+                    currentTooltip = `[E] 확보: ${item.type === "ELEMENT_CARD" ? `${getCardTemplateByElement(item.element).shortName} 원소 +${item.amount}` : item.type}`;
+                    item.x += (p.x - item.x) * 0.08 * dt;
+                    item.y += (p.y - item.y) * 0.08 * dt;
+                }
+            });
+
+            s.stations.forEach(station => {
+                const d = Math.sqrt((station.x - p.x)**2 + (station.y - p.y)**2);
+                if (d < 55) {
+                    nearPickup = true;
+                    currentTooltip = `[E] 상호작용: ${station.name}`;
+                }
+            });
+
+            const tooltipEl = document.getElementById("hud-interaction-tooltip");
+            if (currentTooltip) {
+                tooltipEl.innerText = currentTooltip;
+                tooltipEl.classList.remove("hidden");
+            } else {
+                tooltipEl.classList.add("hidden");
+            }
+
+            s.camera.x += (p.x - canvas.width / (2 * ZOOM_FACTOR) - s.camera.x) * 0.1;
+            s.camera.y += (p.y - canvas.height / (2 * ZOOM_FACTOR) - s.camera.y) * 0.1;
+
+            s.camera.x = Math.max(0, Math.min(s.roomBounds.w - canvas.width / ZOOM_FACTOR, s.camera.x));
+            s.camera.y = Math.max(0, Math.min(s.roomBounds.h - canvas.height / ZOOM_FACTOR, s.camera.y));
+        }
+
+        function findAvailableNextChoices() {
+            if (!activeRoom) return [];
+            activeRoom.clear = true;
+            return routeNodes.filter(n => n.parents && n.parents.includes(activeRoom.id));
+        }
+
+        function triggerPlayerDefeat() {
+            synth.play("hit_player");
+            showFloatingNotification("구조 수송 비상 신호 전송! 던전 탐색을 취소하고 회항합니다.");
+            changeScreen("START");
+        }
+
+        function drawScene() {
+            if (!ctx) return;
+            const s = engineState;
+            const p = s.player;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+
+            let shakeX = 0; let shakeY = 0;
+            if (s.screenShake > 0) {
+                shakeX = (Math.random() - 0.5) * s.screenShake;
+                shakeY = (Math.random() - 0.5) * s.screenShake;
+            }
+
+            ctx.scale(ZOOM_FACTOR, ZOOM_FACTOR);
+            ctx.translate(-s.camera.x + shakeX, -s.camera.y + shakeY);
+
+            const bounds = s.roomBounds;
+            ctx.fillStyle = isCorridor ? "#110c1f" : "#0f0b1a";
+            ctx.fillRect(0, 0, bounds.w, bounds.h);
+
+            if (isTutorialMode && tutorialStep === 0) {
+                ctx.strokeStyle = "#eab308";
+                ctx.fillStyle = "rgba(234, 179, 8, 0.15)";
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(tutorialMarker.x, tutorialMarker.y, tutorialMarker.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("기동 표식 목적지 (WASD)", tutorialMarker.x, tutorialMarker.y - tutorialMarker.radius - 8);
+            }
+
+            ctx.strokeStyle = isCorridor ? "#1f183c" : "#1a1230";
+            ctx.lineWidth = 1;
+            const gridSz = 40;
+            for (let x = 0; x < bounds.w; x += gridSz) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bounds.h); ctx.stroke();
+            }
+            for (let y = 0; y < bounds.h; y += gridSz) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(bounds.w, y); ctx.stroke();
+            }
+
+            ctx.strokeStyle = isTutorialMode ? "#eab308" : "#8b5cf6";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0, 0, bounds.w, bounds.h);
+
+            s.obstacles.forEach(o => {
+                ctx.fillStyle = o.color;
+                ctx.strokeStyle = "#312e81";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.strokeStyle = "rgba(255,255,255,0.05)";
+                ctx.beginPath();
+                ctx.arc(o.x, o.y, o.radius * 0.7, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            s.gateways.forEach(gate => {
+                const timePulse = Date.now() * 0.003;
+                const glowRad = gate.radius + Math.sin(timePulse) * 4;
+
+                ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
+                ctx.beginPath();
+                ctx.arc(gate.x, gate.y, glowRad * 1.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = gate.color;
+                ctx.beginPath();
+                ctx.arc(gate.x, gate.y, gate.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(gate.x, gate.y, gate.radius * 0.6, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(gate.name, gate.x, gate.y - gate.radius - 10);
+            });
+
+            s.stations.forEach(station => {
+                ctx.fillStyle = station.color;
+                ctx.beginPath();
+                ctx.arc(station.x, station.y, station.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(station.x, station.y, station.radius * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 9px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(station.name, station.x, station.y - station.radius - 12);
+            });
+
+            s.groundItems.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, item.radius * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = "bold 8px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(item.type === "ELEMENT_CARD" ? `${getCardTemplateByElement(item.element).shortName}+${item.amount}` : `${item.type}`, item.x, item.y - item.radius - 6);
+            });
+
+            s.projectiles.forEach(proj => {
+                ctx.fillStyle = proj.color;
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "rgba(255,255,255,0.15)";
+                ctx.beginPath();
+                ctx.arc(proj.x - proj.vx * 0.6, proj.y - proj.vy * 0.6, proj.radius * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            s.enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.hitFlash > 0 ? "#ffffff" : enemy.color;
+                
+                // Dim down visual color when frozen
+                if (enemy.freezeDuration > 0) {
+                    ctx.fillStyle = "#38bdf8";
+                }
+
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "#000000";
+                ctx.beginPath();
+                ctx.arc(enemy.x + enemy.vx * 0.5, enemy.y + enemy.vy * 0.5, enemy.radius * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Health bar draw
+                const barW = enemy.radius * 1.8;
+                const hpPct = Math.max(0, enemy.hp / enemy.maxHp);
+                ctx.fillStyle = "#374151";
+                ctx.fillRect(enemy.x - barW/2, enemy.y - enemy.radius - 10, barW, 3);
+                ctx.fillStyle = enemy.freezeDuration > 0 ? "#06b6d4" : "#ef4444";
+                ctx.fillRect(enemy.x - barW/2, enemy.y - enemy.radius - 10, barW * hpPct, 3);
+
+                // Render attached status elements above target
+                if (enemy.attachedElements) {
+                    let activeElems = Object.keys(enemy.attachedElements).filter(el => enemy.attachedElements[el] > 0);
+                    if (activeElems.length > 0) {
+                        let offset = -((activeElems.length - 1) * 10) / 2;
+                        activeElems.forEach(el => {
+                            let elColor = "#ffffff";
+                            if (el === ElementType.FIRE) elColor = "#f97316";
+                            else if (el === ElementType.ICE) elColor = "#38bdf8";
+                            else if (el === ElementType.LIGHTNING) elColor = "#eab308";
+                            else if (el === ElementType.VOID) elColor = "#a855f7";
+
+                            ctx.fillStyle = elColor;
+                            ctx.beginPath();
+                            ctx.arc(enemy.x + offset, enemy.y - enemy.radius - 18, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.strokeStyle = "#ffffff";
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                            
+                            offset += 10;
+                        });
+                    }
+                }
+            });
+
+            if (p.rollDuration > 0) {
+                ctx.fillStyle = "rgba(139, 92, 246, 0.45)";
+                ctx.beginPath();
+                ctx.arc(p.x - p.rollVx * 1.3, p.y - p.rollVy * 1.3, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = p.isInvulnerable ? "#a78bfa" : (selectedCharacter === "SENTINEL" ? "#ea580c" : (selectedCharacter === "OVERSEER" ? "#06b6d4" : "#8b5cf6"));
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            const aimAngle = Math.atan2(mousePos.y - p.y, mousePos.x - p.x);
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + Math.cos(aimAngle) * (p.radius + 6), p.y + Math.sin(aimAngle) * (p.radius + 6));
+            ctx.stroke();
+
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 4.0;
+            ctx.beginPath();
+            ctx.moveTo(p.x + Math.cos(aimAngle)*8, p.y + Math.sin(aimAngle)*8);
+            ctx.lineTo(p.x + Math.cos(aimAngle)*(20 - s.recoilOffset*0.65), p.y + Math.sin(aimAngle)*(20 - s.recoilOffset*0.65));
+            ctx.stroke();
+
+            if (s.muzzleFlashTimer > 0) {
+                ctx.save();
+                ctx.translate(p.x + Math.cos(s.muzzleFlashAngle)*18, p.y + Math.sin(s.muzzleFlashAngle)*18);
+                ctx.rotate(s.muzzleFlashAngle);
+                
+                const grad = ctx.createRadialGradient(0, 0, 1, 15, 0, 25);
+                grad.addColorStop(0, "#ffffff");
+                grad.addColorStop(0.3, "#facc15");
+                grad.addColorStop(0.6, "#f97316");
+                grad.addColorStop(1, "rgba(249, 115, 22, 0)");
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, 24, -0.45, 0.45);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            s.particles.forEach(part => {
+                ctx.fillStyle = part.color;
+                if (part.isCasing) {
+                    ctx.save();
+                    ctx.translate(part.x, part.y);
+                    ctx.rotate(part.life * 0.15);
+                    ctx.fillRect(-2.5, -1, 5, 2);
+                    ctx.restore();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(part.x, part.y, part.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            s.floatingTexts.forEach(ft => {
+                ctx.fillStyle = ft.color;
+                
+                if (ft.isHeader) {
+                    ctx.font = "black 12px 'Share Tech Mono', sans-serif";
+                } else if (ft.isCombo) {
+                    ctx.font = "bold 11px 'Share Tech Mono', sans-serif";
+                } else {
+                    ctx.font = "bold 9px monospace";
+                }
+                
+                ctx.textAlign = "center";
+                ctx.fillText(ft.text, ft.x, ft.y);
+            });
+
+            ctx.restore();
+
+            if (s.hitOverlayTimer > 0) {
+                ctx.save();
+                const flashGrad = ctx.createRadialGradient(
+                    canvas.width/2, canvas.height/2, canvas.width*0.2,
+                    canvas.width/2, canvas.height/2, canvas.width*0.75
+                );
+                flashGrad.addColorStop(0, `rgba(239, 68, 68, 0)`);
+                flashGrad.addColorStop(1, `rgba(185, 28, 28, ${0.45 * (s.hitOverlayTimer / 14)})`);
+                
+                ctx.fillStyle = flashGrad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+                
+                s.hitOverlayTimer--;
+            }
+        }
+
+        function gameLoop() {
+            if (currentScreen === "GAMEPLAY") {
+                updatePhysics();
+                drawScene();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
