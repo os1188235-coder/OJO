@@ -1358,6 +1358,12 @@
         function handleMouseDown(e) {
             if (currentScreen !== "GAMEPLAY") return;
             if (isStationActive || isDungeonMapOpen) return;
+
+            // 장전 UI는 canvas 위에 떠 있으므로, 카드/버튼 클릭이 발사 입력으로 전달되지 않게 막습니다.
+            const reloadDock = document.getElementById("tactical-hand-dock");
+            if (isBulletTime || (reloadDock && reloadDock.contains(e.target))) {
+                return;
+            }
             
             if (e.button === 0) {
                 fireActiveShotgun();
@@ -1443,6 +1449,7 @@
                 bEl.className = "w-4 h-6 rounded border border-white/30 text-black font-black text-[9px] flex items-center justify-center cursor-pointer transform hover:scale-105 active:scale-95";
                 bEl.innerText = bullet.icon || bullet.element.substring(0, 1);
                 bEl.title = bullet.reloadFresh ? "이번 장전에서 넣은 탄환: 제거하면 원소 재고가 환불됩니다." : "기존 약실 탄환: 제거해도 재고가 돌아오지 않습니다.";
+                bEl.onmousedown = (e) => e.stopPropagation();
                 bEl.onclick = (e) => {
                     e.stopPropagation();
                     const removed = stagedChamber.splice(idx, 1)[0];
@@ -1499,6 +1506,7 @@
                     </div>
                 `;
 
+                cardEl.onmousedown = (e) => e.stopPropagation();
                 cardEl.onclick = (e) => {
                     e.stopPropagation();
                     if (disabled) {
@@ -1534,14 +1542,22 @@
         }
 
         function clearStagedChamber() {
+            // 이번 장전에서 새로 넣은 탄환만 제거하고 원소 재고를 되돌립니다.
+            // 기존 약실 탄환까지 통째로 사라지던 혼동을 방지합니다.
             refundFreshStagedBullets(stagedChamber);
-            stagedChamber = [];
+            stagedChamber = stagedChamber.filter(bullet => bullet && bullet.fromExisting).map(bullet => ({ ...bullet }));
             synth.play("clear");
             syncRealtimeReloadUI();
             syncHUDBars();
         }
 
         function finishRealtimeReload() {
+            if (!isBulletTime) return;
+            if (stagedChamber.length === 0) {
+                showFloatingNotification("장전할 탄환이 없습니다. 원소 카드를 1장 이상 선택하십시오!");
+                syncRealtimeReloadUI();
+                return;
+            }
             chamber = stagedChamber.map(stripReloadMeta);
             stagedChamber = [];
             triggerBulletTimeReload(false);
